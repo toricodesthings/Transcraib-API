@@ -1,0 +1,8 @@
+fastapi
+python-multipart
+torch
+apscheduler
+uvicorn[standard]
+openai-whisper
+torch
+psutil

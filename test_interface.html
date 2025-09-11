@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TranscrAIb API - Test Interface</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 50px auto; 
+            padding: 20px; 
+            background-color: #f5f5f5; 
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { color: #333; text-align: center; }
+        .upload-box { 
+            border: 2px dashed #ccc; 
+            padding: 20px; 
+            text-align: center; 
+            margin: 20px 0; 
+            border-radius: 5px; 
+        }
+        input[type="file"] { margin: 10px 0; }
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+        }
+        button:hover { background: #0056b3; }
+        .result { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background: #f8f9fa; 
+            border-radius: 5px; 
+            display: none; 
+        }
+        .status { 
+            padding: 8px; 
+            margin: 5px 0; 
+            border-radius: 3px; 
+            font-weight: bold; 
+        }
+        .pending { background: #fff3cd; color: #856404; }
+        .processing { background: #d1ecf1; color: #0c5460; }
+        .completed { background: #d4edda; color: #155724; }
+        .failed { background: #f8d7da; color: #721c24; }
+        .debug { 
+            background: #e9ecef; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 3px; 
+            font-family: monospace; 
+            font-size: 12px; 
+        }
+        .progress { 
+            width: 100%; 
+            height: 20px; 
+            background: #e9ecef; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            margin: 10px 0; 
+        }
+        .progress-bar { 
+            height: 100%; 
+            background: #007bff; 
+            transition: width 0.3s ease; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TranscrAIb API Test Interface</h1>
+        
+        <div class="upload-box">
+            <h3>Upload Audio/Video Files</h3>
+            <input type="file" id="files" multiple accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.ts,.mov">
+            <br>
+            <button onclick="uploadFiles()">Upload & Transcribe</button>
+        </div>
+        
+        <div class="result" id="result">
+            <h3>Status</h3>
+            <div id="status"></div>
+            <div class="progress" id="progressContainer" style="display: none;">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div id="debug"></div>
+            <div id="output"></div>
+            <button onclick="checkStatus()" style="margin-top: 10px;">Refresh Status</button>
+        </div>
+    </div>
+
+    <script>
+        let taskId = null;
+        let statusCheckCount = 0;
+
+        async function uploadFiles() {
+            const files = document.getElementById('files').files;
+            if (!files.length) {
+                alert('Please select files first');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+
+            try {
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    taskId = result.task_id;
+                    statusCheckCount = 0;
+                    showResult(`Task queued: ${taskId}`, 'pending');
+                    addDebug(`Upload successful. Task ID: ${taskId}`);
+                    checkStatus();
+                } else {
+                    showResult(`Error: ${result.detail}`, 'failed');
+                    addDebug(`Upload failed: ${JSON.stringify(result)}`);
+                }
+            } catch (error) {
+                showResult(`Upload failed: ${error.message}`, 'failed');
+                addDebug(`Upload error: ${error.message}`);
+            }
+        }
+
+        async function checkStatus() {
+            if (!taskId) return;
+
+            statusCheckCount++;
+            addDebug(`Status check #${statusCheckCount} for task ${taskId}`);
+
+            try {
+                const response = await fetch(`/task/status/${taskId}`);
+                const status = await response.json();
+
+                addDebug(`Status response: ${JSON.stringify(status)}`);
+                
+                showResult(`Status: ${status.status}${status.progress ? ` (${status.progress}%)` : ''}`, status.status);
+                
+                // Update progress bar
+                if (status.progress) {
+                    document.getElementById('progressContainer').style.display = 'block';
+                    document.getElementById('progressBar').style.width = `${status.progress}%`;
+                }
+
+                if (status.status === 'completed') {
+                    addDebug('Task completed, getting results...');
+                    getResults();
+                } else if (status.status === 'processing') {
+                    addDebug('Task processing, checking again in 3 seconds...');
+                    setTimeout(checkStatus, 3000);
+                } else if (status.status === 'pending') {
+                    addDebug('Task still pending, checking again in 2 seconds...');
+                    setTimeout(checkStatus, 2000);
+                } else if (status.status === 'failed') {
+                    addDebug(`Task failed: ${status.error_message || 'Unknown error'}`);
+                    showResult(`Failed: ${status.error_message || 'Unknown error'}`, 'failed');
+                } else {
+                    addDebug(`Unknown status: ${status.status}`);
+                }
+            } catch (error) {
+                addDebug(`Status check error: ${error.message}`);
+                showResult(`Status check failed: ${error.message}`, 'failed');
+            }
+        }
+
+        async function getResults() {
+            try {
+                const response = await fetch(`/task/results/${taskId}`);
+                const results = await response.json();
+
+                if (response.ok) {
+                    addDebug(`Results received: ${results.results.length} files`);
+                    let output = '<h4>📝 Results:</h4>';
+                    results.results.forEach((result, i) => {
+                        output += `
+                            <div style="border-left: 3px solid #007bff; padding-left: 10px; margin: 10px 0;">
+                                <strong>File ${i+1}: ${result.filename || 'Unknown'}</strong><br>
+                                <strong>Language:</strong> ${result.language || 'Unknown'}<br>
+                                <strong>Text:</strong><br>
+                                ${result.text || result.error || 'No text available'}
+                            </div>
+                        `;
+                    });
+                    document.getElementById('output').innerHTML = output;
+                } else {
+                    addDebug(`Results error: ${JSON.stringify(results)}`);
+                    showResult(`Error getting results: ${results.detail}`, 'failed');
+                }
+            } catch (error) {
+                addDebug(`Results fetch error: ${error.message}`);
+                showResult(`Failed to get results: ${error.message}`, 'failed');
+            }
+        }
+
+        function showResult(message, statusClass) {
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('status').innerHTML = `<div class="status ${statusClass}">${message}</div>`;
+        }
+
+        function addDebug(message) {
+            const debugDiv = document.getElementById('debug');
+            const timestamp = new Date().toLocaleTimeString();
+            debugDiv.innerHTML += `<div class="debug">[${timestamp}] ${message}</div>`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
+
+        // Check queue info on page load
+        window.onload = async function() {
+            try {
+                const response = await fetch('/task/queue');
+                const queueInfo = await response.json();
+                addDebug(`Queue info: ${JSON.stringify(queueInfo)}`);
+            } catch (error) {
+                addDebug(`Could not fetch queue info: ${error.message}`);
+            }
+        };
+    </script>
+</body>
+</html>
