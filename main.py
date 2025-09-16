@@ -1,13 +1,13 @@
 from fastapi import FastAPI
-import whisper, time
+from fastapi.staticfiles import StaticFiles
+import whisper, time, os
 from database.task_database import TaskDatabase
 from task_management import task_manager
 from hardware_utils import detect_hardware, model_pick
 from endpoints.health import create_health_endpoint
 from endpoints.transcribe import create_transcribe_endpoint
-from endpoints.setmodel import create_model_endpoint
+from endpoints.set import create_model_endpoint
 from endpoints.root import router as root_router
-
 from endpoints.status import router as status_router
 
 # API Configuration 

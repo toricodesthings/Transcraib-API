@@ -6,109 +6,321 @@
     <title>TranscrAIb API - Test Interface</title>
     <style>
         body { 
-            font-family: Arial, sans-serif; 
-            max-width: 600px; 
-            margin: 50px auto; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 900px; 
+            margin: 20px auto; 
             padding: 20px; 
             background-color: #f5f5f5; 
+            line-height: 1.6;
         }
         .container { 
             background: white; 
             padding: 30px; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
         }
-        h1 { color: #333; text-align: center; }
+        h1 { 
+            color: #333; 
+            text-align: center; 
+            margin-bottom: 30px;
+            font-size: 2.2em;
+        }
         .upload-box { 
-            border: 2px dashed #ccc; 
-            padding: 20px; 
+            border: 2px dashed #007bff; 
+            padding: 30px; 
             text-align: center; 
             margin: 20px 0; 
-            border-radius: 5px; 
+            border-radius: 8px; 
+            transition: border-color 0.3s ease;
         }
-        input[type="file"] { margin: 10px 0; }
+        .upload-box:hover {
+            border-color: #0056b3;
+            background-color: #f8f9ff;
+        }
+        input[type="file"] { 
+            margin: 15px 0; 
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            max-width: 400px;
+        }
         button { 
             background: #007bff; 
             color: white; 
             border: none; 
-            padding: 10px 20px; 
-            border-radius: 5px; 
+            padding: 12px 24px; 
+            border-radius: 6px; 
             cursor: pointer; 
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin: 5px;
         }
-        button:hover { background: #0056b3; }
-        .result { 
+        button:hover { 
+            background: #0056b3; 
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .task-overview { 
             margin-top: 20px; 
-            padding: 15px; 
+            padding: 20px; 
             background: #f8f9fa; 
-            border-radius: 5px; 
+            border-radius: 8px; 
             display: none; 
         }
-        .status { 
-            padding: 8px; 
-            margin: 5px 0; 
-            border-radius: 3px; 
-            font-weight: bold; 
+        .overall-progress {
+            width: 100%;
+            height: 25px;
+            background: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 15px 0;
+            position: relative;
         }
-        .pending { background: #fff3cd; color: #856404; }
-        .processing { background: #d1ecf1; color: #0c5460; }
-        .completed { background: #d4edda; color: #155724; }
-        .failed { background: #f8d7da; color: #721c24; }
+        .overall-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            transition: width 0.5s ease;
+            position: relative;
+        }
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+        }
+        .file-list {
+            margin-top: 20px;
+        }
+        .file-item {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+        .file-item.completed {
+            border-left: 5px solid #28a745;
+            background: #f8fff9;
+        }
+        .file-item.processing {
+            border-left: 5px solid #007bff;
+            background: #f8f9ff;
+        }
+        .file-item.failed {
+            border-left: 5px solid #dc3545;
+            background: #fff8f8;
+        }
+        .file-item.pending {
+            border-left: 5px solid #ffc107;
+            background: #fffef8;
+        }
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .file-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+        .file-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-processing { background: #d1ecf1; color: #0c5460; }
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-failed { background: #f8d7da; color: #721c24; }
+        .file-progress {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .file-progress-bar {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+        .file-progress-bar.completed { background: #28a745; }
+        .file-progress-bar.failed { background: #dc3545; }
+        .transcription-result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f1f8ff;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        .transcription-text {
+            font-style: italic;
+            line-height: 1.5;
+            color: #333;
+            margin-top: 10px;
+        }
+        .error-message {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8d7da;
+            color: #721c24;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .debug-section { 
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
         .debug { 
             background: #e9ecef; 
-            padding: 10px; 
-            margin: 10px 0; 
-            border-radius: 3px; 
-            font-family: monospace; 
-            font-size: 12px; 
+            padding: 8px 12px; 
+            margin: 5px 0; 
+            border-radius: 4px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 11px;
+            border-left: 3px solid #6c757d;
         }
-        .progress { 
-            width: 100%; 
-            height: 20px; 
-            background: #e9ecef; 
-            border-radius: 10px; 
-            overflow: hidden; 
-            margin: 10px 0; 
+        .actions {
+            margin-top: 20px;
+            text-align: center;
         }
-        .progress-bar { 
-            height: 100%; 
-            background: #007bff; 
-            transition: width 0.3s ease; 
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>TranscrAIb API Test Interface</h1>
+        <h1>🎵 TranscrAIb API Test Interface</h1>
         
         <div class="upload-box">
-            <h3>Upload Audio/Video Files</h3>
+            <h3>📁 Upload Audio/Video Files</h3>
+            <p>Select multiple files for batch transcription</p>
             <input type="file" id="files" multiple accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.ts,.mov">
             <br>
-            <button onclick="uploadFiles()">Upload & Transcribe</button>
+            <button onclick="uploadFiles()" id="uploadBtn">Upload & Transcribe</button>
         </div>
-        
-        <div class="result" id="result">
-            <h3>Status</h3>
-            <div id="status"></div>
-            <div class="progress" id="progressContainer" style="display: none;">
-                <div class="progress-bar" id="progressBar"></div>
+
+        <!-- Task Overview Section -->
+        <div class="task-overview" id="taskOverview">
+            <h3>📊 Task Progress</h3>
+            <div id="taskId"></div>
+            
+            <!-- Overall Progress -->
+            <div class="overall-progress">
+                <div class="overall-progress-bar" id="overallProgressBar">
+                    <div class="progress-text" id="overallProgressText">0%</div>
+                </div>
             </div>
-            <div id="debug"></div>
-            <div id="output"></div>
-            <button onclick="checkStatus()" style="margin-top: 10px;">Refresh Status</button>
+            
+            <!-- Summary Stats -->
+            <div class="summary-stats" id="summaryStats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalFiles">0</div>
+                    <div class="stat-label">Total Files</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="completedFiles">0</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="processingFiles">0</div>
+                    <div class="stat-label">Processing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="failedFiles">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+            </div>
+
+            <!-- Individual File Progress -->
+            <div class="file-list" id="fileList"></div>
+
+            <!-- Actions -->
+            <div class="actions">
+                <button onclick="pollTaskStatus()" class="btn-secondary">🔄 Refresh Status</button>
+                <button onclick="clearAll()" class="btn-danger">🗑️ Clear All</button>
+                <button onclick="downloadResults()" id="downloadBtn" style="display: none;">💾 Download Results</button>
+            </div>
+        </div>
+
+        <!-- Debug Section -->
+        <div class="debug-section">
+            <h4>🔍 Debug Log</h4>
+            <div id="debugLog"></div>
         </div>
     </div>
 
     <script>
-        let taskId = null;
-        let statusCheckCount = 0;
+        let currentTaskId = null;
+        let pollingInterval = null;
+        let taskData = null;
 
+        // Upload files and start transcription
         async function uploadFiles() {
             const files = document.getElementById('files').files;
             if (!files.length) {
+                addDebug('❌ No files selected');
                 alert('Please select files first');
                 return;
             }
+
+            // Disable upload button
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('uploadBtn').textContent = 'Uploading...';
 
             const formData = new FormData();
             for (let file of files) {
@@ -116,119 +328,243 @@
             }
 
             try {
+                addDebug(`📤 Uploading ${files.length} files...`);
+                
                 const response = await fetch('/transcribe', {
                     method: 'POST',
                     body: formData
                 });
+                
                 const result = await response.json();
                 
                 if (response.ok) {
-                    taskId = result.task_id;
-                    statusCheckCount = 0;
-                    showResult(`Task queued: ${taskId}`, 'pending');
-                    addDebug(`Upload successful. Task ID: ${taskId}`);
-                    checkStatus();
+                    currentTaskId = result.task_id;
+                    addDebug(`✅ Upload successful! Task ID: ${currentTaskId}`);
+                    
+                    // Show task overview
+                    document.getElementById('taskOverview').style.display = 'block';
+                    document.getElementById('taskId').innerHTML = `<strong>Task ID:</strong> ${currentTaskId}`;
+                    
+                    // Start polling for progress
+                    startPolling();
                 } else {
-                    showResult(`Error: ${result.detail}`, 'failed');
-                    addDebug(`Upload failed: ${JSON.stringify(result)}`);
+                    addDebug(`❌ Upload failed: ${JSON.stringify(result)}`);
+                    alert(`Upload failed: ${result.detail?.message || result.detail}`);
                 }
             } catch (error) {
-                showResult(`Upload failed: ${error.message}`, 'failed');
-                addDebug(`Upload error: ${error.message}`);
+                addDebug(`❌ Upload error: ${error.message}`);
+                alert(`Upload failed: ${error.message}`);
+            } finally {
+                // Re-enable upload button
+                document.getElementById('uploadBtn').disabled = false;
+                document.getElementById('uploadBtn').textContent = 'Upload & Transcribe';
             }
         }
 
-        async function checkStatus() {
-            if (!taskId) return;
+        // Start polling for task status
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // Poll immediately, then every 2 seconds
+            pollTaskStatus();
+            pollingInterval = setInterval(pollTaskStatus, 2000);
+        }
 
-            statusCheckCount++;
-            addDebug(`Status check #${statusCheckCount} for task ${taskId}`);
-
-            try {
-                const response = await fetch(`/task/status/${taskId}`);
-                const status = await response.json();
-
-                addDebug(`Status response: ${JSON.stringify(status)}`);
-                
-                showResult(`Status: ${status.status}${status.progress ? ` (${status.progress}%)` : ''}`, status.status);
-                
-                // Update progress bar
-                if (status.progress) {
-                    document.getElementById('progressContainer').style.display = 'block';
-                    document.getElementById('progressBar').style.width = `${status.progress}%`;
-                }
-
-                if (status.status === 'completed') {
-                    addDebug('Task completed, getting results...');
-                    getResults();
-                } else if (status.status === 'processing') {
-                    addDebug('Task processing, checking again in 3 seconds...');
-                    setTimeout(checkStatus, 3000);
-                } else if (status.status === 'pending') {
-                    addDebug('Task still pending, checking again in 2 seconds...');
-                    setTimeout(checkStatus, 2000);
-                } else if (status.status === 'failed') {
-                    addDebug(`Task failed: ${status.error_message || 'Unknown error'}`);
-                    showResult(`Failed: ${status.error_message || 'Unknown error'}`, 'failed');
-                } else {
-                    addDebug(`Unknown status: ${status.status}`);
-                }
-            } catch (error) {
-                addDebug(`Status check error: ${error.message}`);
-                showResult(`Status check failed: ${error.message}`, 'failed');
+        // Stop polling
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
             }
         }
 
-        async function getResults() {
-            try {
-                const response = await fetch(`/task/results/${taskId}`);
-                const results = await response.json();
+        // Poll task status and update UI
+        async function pollTaskStatus() {
+            if (!currentTaskId) return;
 
+            try {
+                const response = await fetch(`/task/status/${currentTaskId}`);
+                
+                if (!response.ok) {
+                    addDebug(`❌ Status check failed: ${response.status}`);
+                    return;
+                }
+
+                taskData = await response.json();
+                addDebug(`📊 Status update: ${taskData.summary.overall_status} (${taskData.summary.overall_progress}%)`);
+                
+                updateTaskOverview(taskData);
+                updateFileList(taskData.files);
+                
+                // Check if all files are done
+                const allDone = taskData.files.every(f => 
+                    f.status === 'completed' || f.status === 'failed'
+                );
+                
+                if (allDone) {
+                    addDebug('🎉 All files completed!');
+                    stopPolling();
+                    document.getElementById('downloadBtn').style.display = 'inline-block';
+                }
+                
+            } catch (error) {
+                addDebug(`❌ Polling error: ${error.message}`);
+            }
+        }
+
+        // Update task overview section
+        function updateTaskOverview(data) {
+            const summary = data.summary;
+            
+            // Update overall progress
+            const progressBar = document.getElementById('overallProgressBar');
+            const progressText = document.getElementById('overallProgressText');
+            
+            progressBar.style.width = `${summary.overall_progress}%`;
+            progressText.textContent = `${summary.overall_progress}%`;
+            
+            // Update stats
+            document.getElementById('totalFiles').textContent = summary.total_files;
+            document.getElementById('completedFiles').textContent = summary.completed;
+            document.getElementById('processingFiles').textContent = summary.processing;
+            document.getElementById('failedFiles').textContent = summary.failed;
+        }
+
+        // Update individual file list
+        function updateFileList(files) {
+            const fileListContainer = document.getElementById('fileList');
+            
+            fileListContainer.innerHTML = files.map(file => `
+                <div class="file-item ${file.status}" id="file-${file.file_index}">
+                    <div class="file-header">
+                        <div class="file-name">📄 ${file.filename}</div>
+                        <div class="file-status status-${file.status}">${file.status}</div>
+                    </div>
+                    
+                    <div class="file-progress">
+                        <div class="file-progress-bar ${file.status}" style="width: ${file.progress}%"></div>
+                    </div>
+                    
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Progress: ${file.progress}% | Index: ${file.file_index}
+                    </div>
+                    
+                    ${file.result ? `
+                        <div class="transcription-result">
+                            <strong>🎯 Transcription Result:</strong>
+                            <div class="transcription-text">"${file.result.transcription}"</div>
+                            ${file.result.language ? `<div style="margin-top: 10px;"><strong>Language:</strong> ${file.result.language}</div>` : ''}
+                            ${file.result.duration ? `<div><strong>Duration:</strong> ${file.result.duration}s</div>` : ''}
+                        </div>
+                    ` : ''}
+                    
+                    ${file.error ? `
+                        <div class="error-message">
+                            <strong>❌ Error:</strong> ${file.error}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        // Clear all tasks
+        async function clearAll() {
+            if (!confirm('Are you sure you want to clear all tasks? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                addDebug('🗑️ Clearing all tasks...');
+                
+                const response = await fetch('/admin/clear-all', {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
                 if (response.ok) {
-                    addDebug(`Results received: ${results.results.length} files`);
-                    let output = '<h4>📝 Results:</h4>';
-                    results.results.forEach((result, i) => {
-                        output += `
-                            <div style="border-left: 3px solid #007bff; padding-left: 10px; margin: 10px 0;">
-                                <strong>File ${i+1}: ${result.filename || 'Unknown'}</strong><br>
-                                <strong>Language:</strong> ${result.language || 'Unknown'}<br>
-                                <strong>Text:</strong><br>
-                                ${result.text || result.error || 'No text available'}
-                            </div>
-                        `;
-                    });
-                    document.getElementById('output').innerHTML = output;
+                    addDebug(`✅ Cleared ${result.deleted_counts.deleted_tasks} tasks and ${result.deleted_counts.deleted_files} files`);
+                    
+                    // Reset UI
+                    currentTaskId = null;
+                    taskData = null;
+                    stopPolling();
+                    document.getElementById('taskOverview').style.display = 'none';
+                    document.getElementById('downloadBtn').style.display = 'none';
+                    
                 } else {
-                    addDebug(`Results error: ${JSON.stringify(results)}`);
-                    showResult(`Error getting results: ${results.detail}`, 'failed');
+                    addDebug(`❌ Clear failed: ${JSON.stringify(result)}`);
+                    alert('Failed to clear tasks');
                 }
             } catch (error) {
-                addDebug(`Results fetch error: ${error.message}`);
-                showResult(`Failed to get results: ${error.message}`, 'failed');
+                addDebug(`❌ Clear error: ${error.message}`);
+                alert(`Clear failed: ${error.message}`);
             }
         }
 
-        function showResult(message, statusClass) {
-            document.getElementById('result').style.display = 'block';
-            document.getElementById('status').innerHTML = `<div class="status ${statusClass}">${message}</div>`;
+        // Download results as JSON
+        function downloadResults() {
+            if (!taskData) return;
+
+            const results = {
+                task_id: currentTaskId,
+                summary: taskData.summary,
+                files: taskData.files.map(file => ({
+                    filename: file.filename,
+                    status: file.status,
+                    transcription: file.result?.transcription || null,
+                    language: file.result?.language || null,
+                    duration: file.result?.duration || null,
+                    error: file.error || null
+                }))
+            };
+
+            const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transcription-results-${currentTaskId}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            addDebug('💾 Results downloaded');
         }
 
+        // Add debug message
         function addDebug(message) {
-            const debugDiv = document.getElementById('debug');
+            const debugLog = document.getElementById('debugLog');
             const timestamp = new Date().toLocaleTimeString();
-            debugDiv.innerHTML += `<div class="debug">[${timestamp}] ${message}</div>`;
-            debugDiv.scrollTop = debugDiv.scrollHeight;
+            const debugEntry = document.createElement('div');
+            debugEntry.className = 'debug';
+            debugEntry.textContent = `[${timestamp}] ${message}`;
+            debugLog.appendChild(debugEntry);
+            debugLog.scrollTop = debugLog.scrollHeight;
         }
 
         // Check queue info on page load
         window.onload = async function() {
+            addDebug('🚀 Interface loaded');
+            
             try {
                 const response = await fetch('/task/queue');
                 const queueInfo = await response.json();
-                addDebug(`Queue info: ${JSON.stringify(queueInfo)}`);
+                addDebug(`📋 Queue info: ${queueInfo.queue_length} pending, processing: ${queueInfo.is_processing}`);
+                
+                if (queueInfo.current_task_id) {
+                    addDebug(`⚡ Found active task: ${queueInfo.current_task_id}`);
+                }
             } catch (error) {
-                addDebug(`Could not fetch queue info: ${error.message}`);
+                addDebug(`⚠️ Could not fetch queue info: ${error.message}`);
             }
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = function() {
+            stopPolling();
         };
     </script>
 </body>

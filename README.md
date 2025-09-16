@@ -1,13 +1,17 @@
-# Whisper Transcription API
+# 🎵 TranscrAIb - Whisper Transcription API
 
-A FastAPI-based audio/video transcription service using OpenAI's Whisper model with queue management and hardware optimization. This API can be ran locally, refer to installation for how to. 
+A FastAPI-based audio/video transcription service using OpenAI's Whisper model with advanced queue management, file-level progress tracking, and hardware optimization. This API can be run locally with real-time progress monitoring for each individual file.
 
-## Features
+## ✨ Features
 
 - 🎵 **Multi-format Audio/Video Support**: MP3, WAV, MP4, M4A, AAC, OGG, WebM, TS, MOV
-- 🔄 **Queue Management**: Background task processing with real-time status updates
-- 🚀 **Hardware Detection**: Automatic GPU detection and model selection
-- 📁 **Batch Processing**: Upload up to 5 files per request
+- 🔄 **Advanced Queue Management**: Background task processing with real-time status updates
+- � **File-Level Progress Tracking**: Monitor progress of each file independently
+- ⚡ **Immediate Results**: Get transcription results as soon as each file completes
+- �🚀 **Hardware Detection**: Automatic GPU detection and optimal model selection
+- 📁 **Batch Processing**: Upload up to 5 files per request with independent processing
+- 🛡️ **Security Features**: Comprehensive file validation and malware protection
+- 🧹 **Admin Controls**: System management with clear all functionality
 
 ## Quick Start
 
@@ -56,64 +60,247 @@ Returns system status, hardware info, current model, and uptime.
 ```http
 POST /transcribe
 ```
-Upload files for transcription.
+Upload files for transcription. Returns a task ID for tracking progress.
 
 **Parameters:**
 - `files`: Audio/video files (max 5, 1GB each)
 - `user_id`: Optional user identifier
 
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "task_id": "abc123-def456-789",
+  "status": "queued",
+  "message": "Successfully queued 3 file(s) for transcription",
+  "summary": {
+    "file_count": 3,
+    "total_size": "15.2 MB",
+    "files": [
+      {
+        "filename": "audio1.mp3",
+        "size": "5.1 MB",
+        "content_type": "audio/mpeg"
+      },
+      {
+        "filename": "video1.mp4", 
+        "size": "10.1 MB",
+        "content_type": "video/mp4"
+      }
+    ]
+  },
+  "api": {
+    "status_endpoint": "/task/status/abc123-def456-789",
+    "results_endpoint": "/task/results/abc123-def456-789",
+    "cancel_endpoint": "/task/cancel/abc123-def456-789"
+  },
+  "estimated_processing_time": "6-15 minutes"
+}
+```
+
+### Check Task Status (File-Level Tracking)
+```http
+GET /task/status/{task_id}
+```
+Get real-time status with individual file progress and immediate results.
+
 **Response:**
 ```json
 {
-  "task_id": "somethingsomething123",
-  "status": "queued",
-  "message": "Successfully queued 2 file(s) for transcription",
-  "file_count": 2,
-  "files": ["audio1.mp3", "video1.mp4"],
-  "next_steps": {
-    "view_status": "/task/status/somethingsomething123",
-    "view_results": "/task/results/somethingsomething123"
+  "task_id": "abc123-def456-789",
+  "created_at": "2025-01-15T10:30:00",
+  "summary": {
+    "overall_status": "processing",
+    "overall_progress": 65,
+    "total_files": 3,
+    "completed": 1,
+    "failed": 0,
+    "processing": 1,
+    "pending": 1
+  },
+  "files": [
+    {
+      "file_index": 0,
+      "filename": "audio1.mp3",
+      "status": "completed",
+      "progress": 100,
+      "result": {
+        "transcription": "Hello world, this is a test recording...",
+        "language": "en",
+        "duration": 45.2
+      },
+      "error": null,
+      "timing": {
+        "created_at": "2025-01-15T10:30:00",
+        "started_at": "2025-01-15T10:30:05",
+        "completed_at": "2025-01-15T10:32:15"
+      }
+    },
+    {
+      "file_index": 1,
+      "filename": "video1.mp4",
+      "status": "processing",
+      "progress": 75,
+      "result": null,
+      "error": null,
+      "timing": {
+        "created_at": "2025-01-15T10:30:00",
+        "started_at": "2025-01-15T10:32:20",
+        "completed_at": null
+      }
+    },
+    {
+      "file_index": 2,
+      "filename": "audio2.wav",
+      "status": "pending",
+      "progress": 0,
+      "result": null,
+      "error": null,
+      "timing": {
+        "created_at": "2025-01-15T10:30:00",
+        "started_at": null,
+        "completed_at": null
+      }
+    }
+  ],
+  "completed_results": [
+    {
+      "file_index": 0,
+      "filename": "audio1.mp3",
+      "transcription": "Hello world, this is a test recording...",
+      "language": "en",
+      "duration": 45.2,
+      "completed_at": "2025-01-15T10:32:15"
+    }
+  ]
+}
+```
+
+### Get Individual File Status
+```http
+GET /task/status/{task_id}/file/{file_index}
+```
+Get status and progress of a specific file within a task.
+
+**Response:**
+```json
+{
+  "task_id": "abc123-def456-789",
+  "file": {
+    "file_index": 1,
+    "filename": "video1.mp4",
+    "status": "processing",
+    "progress": 75,
+    "result": null,
+    "error": null,
+    "timing": {
+      "created_at": "2025-01-15T10:30:00",
+      "started_at": "2025-01-15T10:32:20",
+      "completed_at": null
+    }
   }
 }
 ```
 
-### Check Task Status
+### Get Completed Results Only
 ```http
-GET /task/status/{task_id}
+GET /task/results/{task_id}/completed
 ```
-Get real-time status of a transcription task.
+Get only the completed file results (available immediately, don't wait for entire batch).
 
 **Response:**
 ```json
 {
-  "id": "somethingsomething123",
-  "status": "processing",
-  "progress": 45,
-  "user_id": "user123",
-  "file_count": 2,
-  "created_at": "2024-01-15T10:30:00Z",
-  "started_at": "2024-01-15T10:30:05Z"
-}
-```
-
-### Get Task Results
-```http
-GET /task/results/{task_id}
-```
-Retrieve transcription results for completed tasks.
-
-**Response:**
-```json
-{
-  "id": "abc123",
-  "status": "completed",
+  "task_id": "abc123-def456-789",
+  "completed_count": 2,
+  "total_count": 3,
   "results": [
     {
       "file_index": 0,
       "filename": "audio1.mp3",
-      "model_used": "turbo",
+      "transcription": "Hello world, this is a test recording...",
       "language": "en",
-      "text": "Hello, this is a transcription of the audio file."
+      "duration": 45.2,
+      "completed_at": "2025-01-15T10:32:15"
+    },
+    {
+      "file_index": 2,
+      "filename": "audio2.wav",
+      "transcription": "This is another audio transcription...",
+      "language": "en",
+      "duration": 32.1,
+      "completed_at": "2025-01-15T10:35:42"
+    }
+  ]
+}
+```
+
+### Get Individual File Result
+```http
+GET /task/results/{task_id}/file/{file_index}
+```
+Get result for individual file (available immediately when file completes).
+
+**Response:**
+```json
+{
+  "task_id": "abc123-def456-789",
+  "file_index": 0,
+  "filename": "audio1.mp3",
+  "transcription": "Hello world, this is a test recording...",
+  "language": "en",
+  "duration": 45.2,
+  "completed_at": "2025-01-15T10:32:15"
+}
+```
+
+### Get Complete Task Results
+```http
+GET /task/results/{task_id}
+```
+Retrieve all transcription results for completed tasks (all files must be done).
+
+**Response:**
+```json
+{
+  "task_id": "abc123-def456-789",
+  "completed_at": "2025-01-15T10:35:42",
+  "summary": {
+    "overall_status": "completed",
+    "overall_progress": 100,
+    "total_files": 3,
+    "completed": 2,
+    "failed": 1,
+    "processing": 0,
+    "pending": 0
+  },
+  "results": [
+    {
+      "file_index": 0,
+      "filename": "audio1.mp3",
+      "status": "completed",
+      "transcription": "Hello world, this is a test recording...",
+      "language": "en",
+      "duration": 45.2,
+      "error": null
+    },
+    {
+      "file_index": 1,
+      "filename": "video1.mp4",
+      "status": "failed",
+      "transcription": null,
+      "language": null,
+      "duration": null,
+      "error": "Unsupported video codec"
+    },
+    {
+      "file_index": 2,
+      "filename": "audio2.wav",
+      "status": "completed",
+      "transcription": "This is another audio transcription...",
+      "language": "en",
+      "duration": 32.1,
+      "error": null
     }
   ]
 }
@@ -128,13 +315,24 @@ Get current queue status and statistics.
 **Response:**
 ```json
 {
-  "queue_length": 3,
+  "queue_length": 2,
   "is_processing": true,
-  "current_task": {
-    "id": "def456",
-    "status": "processing",
-    "progress": 25
-  }
+  "current_task_id": "def456-789-abc",
+  "current_task_summary": {
+    "overall_status": "processing",
+    "overall_progress": 45,
+    "total_files": 3,
+    "completed": 1,
+    "processing": 1,
+    "pending": 1
+  },
+  "pending_tasks": [
+    {
+      "task_id": "ghi789-abc-123",
+      "file_count": 2,
+      "created_at": "2025-01-15T10:45:00"
+    }
+  ]
 }
 ```
 
@@ -175,27 +373,126 @@ Force a specific Whisper model for transcription.
 }
 ```
 
+#### Get System Statistics
+```http
+GET /admin/stats
+```
+Get comprehensive system statistics.
+
+**Response:**
+```json
+{
+  "file_statistics": {
+    "file_counts": {
+      "pending": 3,
+      "processing": 1,
+      "completed": 25,
+      "failed": 2
+    },
+    "total_files": 31
+  },
+  "queue_status": {
+    "queue_length": 2,
+    "is_processing": true,
+    "current_task_id": "abc123"
+  },
+  "system_state": {
+    "is_processing": true,
+    "current_task_id": "abc123",
+    "model_loaded": true,
+    "model_name": "whisper-base"
+  }
+}
+```
+
 ## Usage Examples
 
 ### Using curl
 
 **Upload for transcription:**
 ```bash
-curl -X POST "http://localhost:8000/transcribe" \
+curl -X POST "http://localhost:9005/transcribe" \
   -F "files=@audio.mp3" \
+  -F "files=@video.mp4" \
   -F "user_id=user123"
 ```
 
-**Check status:**
+**Check status with file-level details:**
 ```bash
-curl "http://localhost:8000/task/status/abc123"
+curl "http://localhost:9005/task/status/abc123-def456-789"
+```
+
+**Get completed results only:**
+```bash
+curl "http://localhost:9005/task/results/abc123-def456-789/completed"
+```
+
+**Get individual file result:**
+```bash
+curl "http://localhost:9005/task/results/abc123-def456-789/file/0"
 ```
 
 **Change model:**
 ```bash
-curl -X POST "http://localhost:8000/model/set" \
+curl -X POST "http://localhost:9005/model/set" \
   -H "Content-Type: application/json" \
   -d '{"model_name": "base"}'
+```
+
+### Using JavaScript (Frontend Integration)
+
+**Upload and poll for progress:**
+```javascript
+// Upload files
+const formData = new FormData();
+formData.append('files', file1);
+formData.append('files', file2);
+
+const uploadResponse = await fetch('/transcribe', {
+  method: 'POST',
+  body: formData
+});
+
+const { task_id } = await uploadResponse.json();
+
+// Poll for progress
+const pollProgress = async () => {
+  const response = await fetch(`/task/status/${task_id}`);
+  const data = await response.json();
+  
+  // Update UI for each file
+  data.files.forEach(file => {
+    updateFileProgress(file.file_index, file.progress, file.status);
+    
+    // Show result immediately when available
+    if (file.result) {
+      displayTranscription(file.filename, file.result.transcription);
+    }
+  });
+  
+  // Continue polling if not all files are done
+  const allDone = data.files.every(f => 
+    f.status === 'completed' || f.status === 'failed'
+  );
+  
+  if (!allDone) {
+    setTimeout(pollProgress, 2000);
+  }
+};
+
+pollProgress();
+```
+
+**Get only completed results:**
+```javascript
+const getCompletedResults = async (taskId) => {
+  const response = await fetch(`/task/results/${taskId}/completed`);
+  const data = await response.json();
+  
+  data.results.forEach(result => {
+    displayTranscription(result.filename, result.transcription);
+  });
+};
 ```
 
 ## Supported File Formats
@@ -214,7 +511,7 @@ curl -X POST "http://localhost:8000/model/set" \
 - **TS** (audio/ts, video transport streams)
 
 ### File Limits
-- **Maximum file size**: 1GB per file (Subject to change)
+- **Maximum file size**: 1GB per file
 - **Maximum files per batch**: 5 files
 - **Supported extensions**: .mp3, .wav, .m4a, .mp4, .aac, .ogg, .webm, .ts, .mov
 
@@ -232,7 +529,7 @@ curl -X POST "http://localhost:8000/model/set" \
   - 6GB+ for turbo/medium models
   - 10GB+ for large models
 
-### Model Performance Guide (Based on OpenAI's Documentation)
+### Model Performance Guide
 | Model | VRAM | CPU RAM | Speed | Accuracy |
 |-------|------|---------|--------|----------|
 | tiny  | 1GB  | 1GB     | Fastest | Lowest |
@@ -244,7 +541,7 @@ curl -X POST "http://localhost:8000/model/set" \
 
 ## Configuration
 
-The API automatically detects available hardware and selects the optimal model. You can override this selection using the `/model/set` endpoint if you are running this API yourself locally.
+The API automatically detects available hardware and selects the optimal model. You can override this selection using the `/model/set` endpoint.
 
 ## Error Handling
 
@@ -253,8 +550,19 @@ The API returns detailed error messages for common issues:
 - **400 Bad Request**: Invalid file format, size, or request parameters
 - **404 Not Found**: Task not found
 - **413 Payload Too Large**: File exceeds size limits
+- **415 Unsupported Media Type**: Invalid file format
 - **422 Unprocessable Entity**: Invalid request format
 - **500 Internal Server Error**: Processing or system errors
+
+### Error Response Format
+```json
+{
+  "error": "FILE_TOO_LARGE",
+  "message": "File 'audio.mp3' is too large. Size: 1.2 GB, Maximum allowed: 1.0 GB",
+  "file": "audio.mp3",
+  "file_index": 0
+}
+```
 
 ## Security Features
 
@@ -264,14 +572,50 @@ The API returns detailed error messages for common issues:
 - **Size Limits**: Enforces maximum file sizes
 - **Temporary File Cleanup**: Automatically removes uploaded files after processing
 
+## Test Interface
+
+The API includes a built-in test interface accessible at `http://localhost:9005/test_interface.html` featuring:
+
+- **File Upload**: Drag & drop or select multiple files
+- **Real-time Progress**: Individual file progress bars and status
+- **Immediate Results**: View transcriptions as files complete
+- **Admin Controls**: Clear all tasks and download results
+- **Debug Console**: Real-time logging and system status
+
+## Architecture Overview
+
+### File-Centric Design
+- Each file within a task has independent status and progress tracking
+- Results available immediately when individual files complete
+- No need to wait for entire batch to finish
+
+### Database Structure
+- **Tasks Table**: Container with task ID and metadata
+- **Task Files Table**: Individual file records with status, progress, and results
+- **Real-time Updates**: Database updates on every progress change
+
+### Processing Flow
+1. **Upload** → Files validated and task created
+2. **Queue** → Task added to processing queue
+3. **Process** → Files processed individually with progress updates
+4. **Results** → Each file result available immediately upon completion
+
 ## Todo List:
 
-- Dockerize the API
-- Implement better error checking and handling
-- Integrate with frontend (in progress)
-- Better testing interface
-- Scaling to handle multiple transcriptions at a time
-- Better logging 
+- [ ] Dockerize the API for easy deployment
+- [ ] Implement WebSocket support for real-time progress updates
+- [ ] Add authentication and user management
+- [ ] Implement file result caching and cleanup scheduling  
+- [ ] Add support for custom Whisper model fine-tuning
+- [ ] Integrate with cloud storage (S3, Google Cloud, etc.)
+- [ ] Add transcription accuracy metrics and confidence scores
+- [ ] Implement batch download of multiple results
+- [ ] Add support for subtitle file generation (SRT, VTT)
+- [ ] Create comprehensive API rate limiting
+- [ ] Add detailed logging and monitoring dashboard
+- [ ] Implement horizontal scaling support
+- [ ] Add support for speaker diarization
+- [ ] Create mobile-friendly test interface
 
 ## License
 

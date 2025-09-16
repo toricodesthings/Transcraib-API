@@ -1,6 +1,6 @@
 import asyncio
 from typing import Optional, List, Dict
-from .task_model import Task
+from .task_model import Task, TaskFile, FileStatus
 from database.task_database import TaskDatabase
 from .task_processor import process_task
 
@@ -16,13 +16,13 @@ is_running = False
 # Global whisper model configuration
 model = None
 model_name = None
-
 def set_model(whisper_model, name: str):
     """Set the Whisper model for processing tasks."""
     global model, model_name
     model = whisper_model
     model_name = name
-
+    
+# The main function to add a task to the queue
 async def add_task(file_paths: List[str], user_id: Optional[str] = None) -> str:
     """Add a new task to the queue and start processing if not already running."""
     global is_running
@@ -36,11 +36,61 @@ async def add_task(file_paths: List[str], user_id: Optional[str] = None) -> str:
         
     return task.id
 
-def get_status(task_id: str) -> Optional[Dict]:
-    """Get the status of a specific task."""
+def get_task(task_id: str) -> Optional[Task]:
+    """Retrieve a task by its ID."""
+    return db.retrieve_task(task_id)
+
+def get_file(task_id: str, file_index: int) -> Optional[TaskFile]:
+    """Get specific file in a task by task id and file index"""
     task = db.retrieve_task(task_id)
     if task:
-        return task.response_format()
+        return task.get_file(file_index)
+    return None
+
+def get_status(task_id: str) -> Optional[Dict]:
+    """Get the status of a specific task with file-level details."""
+    task = db.retrieve_task(task_id)
+    if task:
+        return task.json_response_format()
+    return None
+
+def get_completed_results(task_id: str) -> Optional[Dict]:
+    task = db.retrieve_task(task_id)
+    if not task:
+        return None
+    
+    completed_files = task.get_completed_files()
+    return {
+        "task_id": task_id,
+        "completed_count": len(completed_files),
+        "total_count": len(task.files),
+        "results": [
+            {
+                "file_index": f.file_index,
+                "file_name": f.file_name,
+                "transcription": f.transcription,
+                "language": f.language,
+                "duration": f.duration,
+                "completed_at": f.completed_at.isoformat()
+            }
+            for f in completed_files
+        ]
+    }
+
+# Get file-specific result
+def get_file_result(task_id: str, file_index: int) -> Optional[Dict]:
+    """Get result for a specific file if completed."""
+    file = get_file(task_id, file_index)
+    if file and file.file_has_result():
+        return {
+            "task_id": task_id,
+            "file_index": file_index,
+            "file_name": file.file_name,
+            "transcription": file.transcription,
+            "language": file.language,
+            "duration": file.duration,
+            "completed_at": file.completed_at.isoformat()
+        }
     return None
 
 def get_queue_info() -> Dict:
@@ -77,20 +127,25 @@ async def _process_queue():
             current_task_id = task.id
             
             # Change state to processing
-            print(f"🔄 Processing task {task.id}...")
-            task.start_processing()
-            db.add_task(task)
+            print(f"🔄 Processing task {task.id} with {len(task.files)}")
             
             # Process the task (calling task processor function)
             try:
                 print(f"📋 Starting transcription for task {task.id} with model {model_name}")
                 await process_task(task, model, model_name, db)
-                print(f"✅ Successfully completed task {task.id}")
+                
+                completed_count = len(task.get_completed_files())
+                failed_count = len(task.get_failed_files())
+                print(f"✅ Task {task.id} completed: {completed_count} successful, {failed_count} failed")
+            
             except Exception as e:
                 print(f"❌ Error processing task {task.id}: {e}")
-                task.fail(str(e))
+
+                for file in task.files:
+                    if file.status in [FileStatus.PENDING, FileStatus.PROCESSING]:
+                        file.fail(f"Task processing error: {str(e)}")
                 db.add_task(task)
-            
+        
             # Clear current task before moving to next
             current_task_id = None
             await asyncio.sleep(0.5)  # Brief pause between tasks
