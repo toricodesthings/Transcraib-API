@@ -14,7 +14,7 @@ async def process_task(task: Task, model, model_name: str, db: TaskDatabase):
             file.start_processing()
             db.add_task(task)  # Save immediately so frontend sees processing status
             
-            result = await _transcribe_file_with_progress(file, model, task, db)
+            await _transcribe_file_with_progress(file, model, task, db)
             
             print(f"✅ File {file.file_name} completed")
             
@@ -35,28 +35,37 @@ async def _transcribe_file_with_progress(file, model, task: Task, db: TaskDataba
     """Transcribe file with independent result storage"""
     
     try:
-        # Progress simulation
-        progress_steps = [10, 50, 70]
+        from mutagen import File
+        # Get file duration for progress estimation
+        audio_file = File(file.file_path)
+        duration = 0
+        if audio_file and audio_file.info:
+            duration = audio_file.info.length
         
-        for progress in progress_steps:
+        # Estimate transcription time (6x faster than file duration)
+        estimated_time = duration / 6 if duration > 0 else 30  # fallback to 30 seconds
+        progress_interval = estimated_time / 4  # 94intervals for 10-90% progress
+        
+        # Start transcription task
+        transcription_task = asyncio.create_task(_transcribe_file(file.file_path, model))
+        
+        # Update progress while transcription runs
+        progress = 10
+        while not transcription_task.done() and progress < 95:
             file.update_progress(progress)
             db.add_task(task)  # Save progress
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(progress_interval)
+            progress += 20
         
-        # Actual transcription
-        result = await _transcribe_file(file.file_path, model)
+        # Wait for transcription to complete
+        result = await transcription_task
         
-        file.update_progress(95)
-        db.add_task(task)  # Save progress
-        
-        # CHANGED: Complete file with independent result
+        # Complete file and save result when done
         file.complete(
             transcription=result.get("text", ""),
             language=result.get("language"),
             duration=result.get("duration")
         )
-        
-        # CHANGED: Save immediately - result now available to frontend
         db.add_task(task)
         
         print(f"✅ File {file.file_name} result available")

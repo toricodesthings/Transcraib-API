@@ -3,7 +3,7 @@ from task_management import task_manager
 
 router = APIRouter()
 
-# Endpoint to get status of transcription tasks
+# Endpoint to get STATUS of transcription tasks
 @router.get("/status/{task_id}")
 async def get_task_status(task_id: str):
     """Get task status with independent file results"""
@@ -17,11 +17,9 @@ async def get_task_status(task_id: str):
 
     return task.json_response_format()
 
-# Get status of individual file within a task
+# Get the STATUS of individual file within a task
 @router.get("/status/{task_id}/file/{file_index}")
 async def get_file_status(task_id: str, file_index: int):
-    """Get status and progress of a specific file within a task"""
-    
     file = task_manager.get_file(task_id, file_index)
     if not file:
         raise HTTPException(status_code=404, detail={
@@ -34,25 +32,9 @@ async def get_file_status(task_id: str, file_index: int):
         "file": file.json_response_format()
     }
 
-# Get only completed results
-@router.get("/results/{task_id}/completed")
-async def get_completed_results(task_id: str):
-    """Get only the completed file results (available immediately)"""
-    
-    completed_results = task_manager.get_completed_results(task_id)
-    if completed_results is None:
-        raise HTTPException(status_code=404, detail={
-            "error": "TASK_NOT_FOUND",
-            "message": f"Task {task_id} not found"
-        })
-    
-    return completed_results
-
-# Get result of individual file within a task
+# Get the RESULT of individual file within a task
 @router.get("/results/{task_id}/file/{file_index}")
 async def get_file_result(task_id: str, file_index: int):
-    """Get result for individual file"""
-    
     result = task_manager.get_file_result(task_id, file_index)
     if not result:
         file = task_manager.get_file(task_id, file_index)
@@ -71,8 +53,7 @@ async def get_file_result(task_id: str, file_index: int):
     
     return result
 
-
-# Task results endpoint
+# Task (Parent of File) results
 @router.get("/results/{task_id}")
 async def get_task_results(task_id: str):
     """Get results for completed task (all files must be done)"""
@@ -110,6 +91,20 @@ async def get_task_results(task_id: str):
             for f in task.files
         ]
     }
+    
+# Get only completed results
+@router.get("/results/{task_id}/completed")
+async def get_completed_results(task_id: str):
+    """Get only the completed file results (available immediately)"""
+    
+    completed_results = task_manager.get_completed_results(task_id)
+    if completed_results is None:
+        raise HTTPException(status_code=404, detail={
+            "error": "TASK_NOT_FOUND",
+            "message": f"Task {task_id} not found"
+        })
+    
+    return completed_results
 
 # Endpoint to get current queue information
 @router.get("/queue")

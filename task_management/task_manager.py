@@ -93,18 +93,39 @@ def get_file_result(task_id: str, file_index: int) -> Optional[Dict]:
         }
     return None
 
-def get_queue_info() -> Dict:
-    """Get queue statistics and current processing state."""
-    pending_count = db.count_pending()
-    current_task = None
+def get_queue_info_for_task(task_id: str) -> Dict:
+    """Get queue information specific to a task."""
+    task = db.retrieve_task(task_id)
+    if not task:
+        return {"queue_length": 0, "is_processing": False, "current_task": None}
     
-    if current_task_id:
-        current_task = get_status(current_task_id)
+    # Check if this task has started processing
+    task_has_started = any(file.status != FileStatus.PENDING for file in task.files)
+    
+    if task_has_started:
+        # Task is processing or completed
+        return {
+            "queue_length": 0,  # Not in queue anymore
+            "is_processing": current_task_id == task_id,
+            "current_task": get_status(task_id)
+        }
+    else:
+        # Task is still pending - calculate position in queue
+        position = db.get_task_queue_position(task_id)
+        return {
+            "queue_length": position,
+            "is_processing": False,
+            "current_task": None
+        }
+
+def get_queue_info() -> Dict:
+    """Get general queue statistics."""
+    pending_count = db.count_truly_pending_tasks()  # Only count tasks that haven't started
     
     return {
         "queue_length": pending_count,
         "is_processing": current_task_id is not None,
-        "current_task": current_task
+        "current_task": get_status(current_task_id) if current_task_id else None
     }
 
 # Ensure only one task is in processing at a time, private function

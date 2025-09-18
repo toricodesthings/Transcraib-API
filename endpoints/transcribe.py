@@ -160,11 +160,7 @@ def create_transcribe_endpoint(model, model_name):
                 "status": "queued",
                 "message": f"Successfully queued {len(files)} file(s) for transcription",
                 "file_count": len(files),
-                "files": [f.filename for f in files],
-                "next_steps": {
-                    "view_status": f"/task/status/{task_id}",
-                    "view_results": f"/task/results/{task_id}"
-                }
+                "files": [f.filename for f in files]
             }
         
         # Cleanup temp files on error

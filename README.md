@@ -69,14 +69,11 @@ Upload files for transcription. Returns a task ID for tracking progress.
 **Response (201 Created):**
 ```json
 {
-  "success": true,
   "task_id": "abc123-def456-789",
   "status": "queued",
   "message": "Successfully queued 3 file(s) for transcription",
-  "summary": {
-    "file_count": 3,
-    "total_size": "15.2 MB",
-    "files": [
+  "file_count": 5,
+  "files": [
       {
         "filename": "audio1.mp3",
         "size": "5.1 MB",
@@ -88,13 +85,6 @@ Upload files for transcription. Returns a task ID for tracking progress.
         "content_type": "video/mp4"
       }
     ]
-  },
-  "api": {
-    "status_endpoint": "/task/status/abc123-def456-789",
-    "results_endpoint": "/task/results/abc123-def456-789",
-    "cancel_endpoint": "/task/cancel/abc123-def456-789"
-  },
-  "estimated_processing_time": "6-15 minutes"
 }
 ```
 
@@ -245,12 +235,15 @@ Get result for individual file (available immediately when file completes).
 ```json
 {
   "task_id": "abc123-def456-789",
-  "file_index": 0,
-  "filename": "audio1.mp3",
-  "transcription": "Hello world, this is a test recording...",
-  "language": "en",
-  "duration": 45.2,
-  "completed_at": "2025-01-15T10:32:15"
+  "file":
+  {
+    "file_index": 0,
+    "filename": "audio1.mp3",
+    "transcription": "Hello world, this is a test recording...",
+    "language": "en",
+    "duration": 45.2,
+    "completed_at": "2025-01-15T10:32:15"
+  }
 }
 ```
 
@@ -373,38 +366,6 @@ Force a specific Whisper model for transcription.
 }
 ```
 
-#### Get System Statistics
-```http
-GET /admin/stats
-```
-Get comprehensive system statistics.
-
-**Response:**
-```json
-{
-  "file_statistics": {
-    "file_counts": {
-      "pending": 3,
-      "processing": 1,
-      "completed": 25,
-      "failed": 2
-    },
-    "total_files": 31
-  },
-  "queue_status": {
-    "queue_length": 2,
-    "is_processing": true,
-    "current_task_id": "abc123"
-  },
-  "system_state": {
-    "is_processing": true,
-    "current_task_id": "abc123",
-    "model_loaded": true,
-    "model_name": "whisper-base"
-  }
-}
-```
-
 ## Usage Examples
 
 ### Using curl
@@ -439,62 +400,6 @@ curl -X POST "http://localhost:9005/model/set" \
   -d '{"model_name": "base"}'
 ```
 
-### Using JavaScript (Frontend Integration)
-
-**Upload and poll for progress:**
-```javascript
-// Upload files
-const formData = new FormData();
-formData.append('files', file1);
-formData.append('files', file2);
-
-const uploadResponse = await fetch('/transcribe', {
-  method: 'POST',
-  body: formData
-});
-
-const { task_id } = await uploadResponse.json();
-
-// Poll for progress
-const pollProgress = async () => {
-  const response = await fetch(`/task/status/${task_id}`);
-  const data = await response.json();
-  
-  // Update UI for each file
-  data.files.forEach(file => {
-    updateFileProgress(file.file_index, file.progress, file.status);
-    
-    // Show result immediately when available
-    if (file.result) {
-      displayTranscription(file.filename, file.result.transcription);
-    }
-  });
-  
-  // Continue polling if not all files are done
-  const allDone = data.files.every(f => 
-    f.status === 'completed' || f.status === 'failed'
-  );
-  
-  if (!allDone) {
-    setTimeout(pollProgress, 2000);
-  }
-};
-
-pollProgress();
-```
-
-**Get only completed results:**
-```javascript
-const getCompletedResults = async (taskId) => {
-  const response = await fetch(`/task/results/${taskId}/completed`);
-  const data = await response.json();
-  
-  data.results.forEach(result => {
-    displayTranscription(result.filename, result.transcription);
-  });
-};
-```
-
 ## Supported File Formats
 
 ### Audio Formats
@@ -519,11 +424,11 @@ const getCompletedResults = async (taskId) => {
 
 ### Minimum Requirements
 - **CPU**: Any modern x64 processor
-- **RAM**: 4GB system memory
-- **Storage**: 2GB free space
+- **RAM**: 8GB system memory
+- **Storage**: 5GB free space for models
 
 ### Recommended for GPU Acceleration
-- **GPU**: NVIDIA GPU with CUDA support
+- **GPU**: NVIDIA GPU with CUDA support (AMD SUPPORT SOON)
 - **VRAM**: 
   - 2GB+ for small models
   - 6GB+ for turbo/medium models
@@ -541,12 +446,11 @@ const getCompletedResults = async (taskId) => {
 
 ## Configuration
 
-The API automatically detects available hardware and selects the optimal model. You can override this selection using the `/model/set` endpoint.
+The API automatically detects available hardware and selects the optimal model. You can override this selection using the `/model/set` endpoint, this is an admin command, so auth support will be built in.
 
 ## Error Handling
 
 The API returns detailed error messages for common issues:
-
 - **400 Bad Request**: Invalid file format, size, or request parameters
 - **404 Not Found**: Task not found
 - **413 Payload Too Large**: File exceeds size limits
@@ -579,7 +483,6 @@ The API includes a built-in test interface accessible at `http://localhost:9005/
 - **File Upload**: Drag & drop or select multiple files
 - **Real-time Progress**: Individual file progress bars and status
 - **Immediate Results**: View transcriptions as files complete
-- **Admin Controls**: Clear all tasks and download results
 - **Debug Console**: Real-time logging and system status
 
 ## Architecture Overview
@@ -603,19 +506,14 @@ The API includes a built-in test interface accessible at `http://localhost:9005/
 ## Todo List:
 
 - [ ] Dockerize the API for easy deployment
-- [ ] Implement WebSocket support for real-time progress updates
 - [ ] Add authentication and user management
-- [ ] Implement file result caching and cleanup scheduling  
+- [ ] Implement file result saving
 - [ ] Add support for custom Whisper model fine-tuning
-- [ ] Integrate with cloud storage (S3, Google Cloud, etc.)
-- [ ] Add transcription accuracy metrics and confidence scores
 - [ ] Implement batch download of multiple results
 - [ ] Add support for subtitle file generation (SRT, VTT)
 - [ ] Create comprehensive API rate limiting
 - [ ] Add detailed logging and monitoring dashboard
-- [ ] Implement horizontal scaling support
 - [ ] Add support for speaker diarization
-- [ ] Create mobile-friendly test interface
 
 ## License
 

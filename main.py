@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import whisper, time, os
 from database.task_database import TaskDatabase
 from task_management import task_manager
@@ -16,6 +17,14 @@ app = FastAPI(
     title="Whisper Transcription API", 
     version=API_VERSION,
     description="Audio/Video transcription API with queue management"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"], 
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
 
 def main():

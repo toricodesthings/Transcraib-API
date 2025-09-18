@@ -68,27 +68,19 @@ class TaskFile:
     
     def json_response_format(self) -> Dict:
         """Convert file info to dictionary for API responses"""
-        if self.file_has_result():
-            return {
-                "file_index": self.file_index,
-                "file_name": self.file_name,
-                "status": self.status.value,
-                "progress": self.progress,
-                
-                "result": {
-                    "transcription": self.transcription,
-                    "language": self.language,
-                    "duration": self.duration
-                },
-
-                "error": self.error_message,
-                
-                "timestamps": {
-                    "created_at": self.created_at.isoformat(),
-                    "started_at": self.started_at.isoformat() if self.started_at else None,
-                    "completed_at": self.completed_at.isoformat() if self.completed_at else None
-                }
+        return {
+            "file_index": self.file_index,
+            "file_name": self.file_name,
+            "status": self.status.value,
+            "progress": self.progress,
+            "error": self.error_message,
+            
+            "timestamps": {
+                "created_at": self.created_at.isoformat(),
+                "started_at": self.started_at.isoformat() if self.started_at else None,
+                "completed_at": self.completed_at.isoformat() if self.completed_at else None
             }
+        }
 
 # Class data structure for transcription tasks
 class Task:
@@ -157,8 +149,6 @@ class Task:
             },
             
             "files": [file.json_response_format() for file in self.files],
-            
-            # ADDED: Quick access to completed results
             "completed_results": [
                 {
                     "file_index": f.file_index,

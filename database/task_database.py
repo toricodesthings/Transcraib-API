@@ -208,10 +208,41 @@ class TaskDatabase:
                 "total_files": sum(stats.values())
             }
     
-    # Count pending tasks (tasks with pending files)
-    def count_pending(self) -> int:
-        """Count tasks with pending files."""
-        return len(self.retrieve_pending())
+    def get_task_queue_position(self, task_id: str) -> int:
+        """Get the position of a specific task in the queue (1-based)."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Get all truly pending tasks ordered by creation time
+            cursor.execute('''
+                SELECT task_id FROM task_files 
+                GROUP BY task_id 
+                HAVING COUNT(*) = SUM(CASE WHEN status = ? THEN 1 ELSE 0 END)
+                ORDER BY MIN(created_at)
+            ''', (FileStatus.PENDING.value,))
+            
+            pending_task_ids = [row[0] for row in cursor.fetchall()]
+            
+            try:
+                return pending_task_ids.index(task_id) + 1  # 1-based position
+            except ValueError:
+                return 0  # Task not in pending queue
+
+    def count_truly_pending_tasks(self) -> int:
+        """Count tasks where ALL files are still pending."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT COUNT(DISTINCT task_id) FROM task_files 
+                WHERE task_id IN (
+                    SELECT task_id FROM task_files 
+                    GROUP BY task_id 
+                    HAVING COUNT(*) = SUM(CASE WHEN status = ? THEN 1 ELSE 0 END)
+                )
+            ''', (FileStatus.PENDING.value,))
+            
+            return cursor.fetchone()[0]
         
     # Clear all tasks from the database, for initialization or testing
     def clear_all(self) -> Dict[str, int]:
