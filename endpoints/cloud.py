@@ -95,10 +95,13 @@ def models():
     if time.time() - _models_cache["at"] > MODELS_TTL:
         try:
             with _client() as c:
-                res = c.models.list(output_modalities="transcription")
+                page, data = c.models.list(output_modalities="transcription"), []
+                while page:  # SDK paginates: list is under .result.data, .next() fetches more
+                    data += [{"id": m.id, "name": m.name} for m in page.result.data]
+                    page = page.next()
         except OpenRouterError as e:
             raise HTTPException(502, f"OpenRouter error: {e}")
-        _models_cache.update(at=time.time(), data=[{"id": m.id, "name": m.name} for m in res.data])
+        _models_cache.update(at=time.time(), data=data)
     return {"models": _models_cache["data"], "default_model": _default_model()}
 
 
