@@ -8,7 +8,7 @@ router = APIRouter()
 @router.get("/")
 async def read_root():
     try:
-        html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_interface.html")
+        html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "interface.html")
         with open(html_path, 'r', encoding='utf-8') as file:
             html_content = file.read()
         return HTMLResponse(content=html_content, status_code=200)

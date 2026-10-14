@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whisper Transcribe</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1b1f24;--mute:#5d6672;--line:#d9dde3;--acc:#2f6fdb;--ok:#1f8a4c;--bad:#c62f2f;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#121417;--card:#1b1e23;--fg:#e6e8eb;--mute:#9aa3ad;--line:#30353c;--acc:#6b9cff;--ok:#4cc27e;--bad:#ff6b6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px;display:grid;gap:16px}
+section,header{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+h1{font-size:1.3rem;margin:0 0 8px}h2{font-size:1.05rem;margin:0 0 12px}
+dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0}
+dt{color:var(--mute);font-size:.8rem}dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=text]{flex:1;min-width:0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:inherit;font:inherit}
+button{padding:8px 14px;border:1px solid var(--acc);border-radius:6px;background:var(--acc);color:#fff;font:inherit;cursor:pointer}
+button.ghost{background:transparent;color:var(--acc)}button.danger{border-color:var(--bad);background:transparent;color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;color:var(--mute)}
+#drop.over{border-color:var(--acc);color:var(--acc)}
+#files{position:absolute;opacity:0;width:1px;height:1px}
+ul{list-style:none;padding:0;margin:12px 0}
+li{padding:6px 0;border-bottom:1px solid var(--line)}
+.msg{min-height:1.2em;margin:8px 0 0}.err{color:var(--bad);white-space:pre-wrap}.okc{color:var(--ok)}
+progress{width:100%;height:10px}
+.file{border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:12px}
+.file h3{font-size:.95rem;margin:0 0 6px;overflow-wrap:anywhere}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:10px;border-radius:6px;max-height:320px;overflow:auto;margin:8px 0}
+.mute{color:var(--mute);font-size:.85rem}
+.seg{display:inline-flex;border:1px solid var(--acc);border-radius:8px;overflow:hidden;margin:0 0 12px;padding:0}
+.seg legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.seg input{position:absolute;opacity:0}
+.seg label{padding:8px 20px;cursor:pointer;color:var(--acc)}
+.seg input:checked+label{background:var(--acc);color:#fff}
+.seg input:focus-visible+label{outline:2px solid var(--fg);outline-offset:-4px}
+select{flex:1;min-width:0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:inherit;font:inherit}
+.notice{border:1px solid var(--bad);border-radius:8px;padding:10px;color:var(--bad);margin:0 0 12px}
+body.cloud .local-only,body:not(.cloud) .cloud-only{display:none}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Whisper Transcribe</h1>
+  <dl aria-live="polite">
+    <div><dt>Status</dt><dd id="h-status">…</dd></div>
+    <div><dt>GPU</dt><dd id="h-gpu">…</dd></div>
+    <div><dt>Model</dt><dd id="h-model">…</dd></div>
+    <div><dt>Uptime</dt><dd id="h-up">…</dd></div>
+    <div><dt>Queue</dt><dd id="h-queue">…</dd></div>
+  </dl>
+</header>
+
+<section aria-labelledby="up-h">
+  <h2 id="up-h">Upload</h2>
+  <fieldset class="seg"><legend>Transcription mode</legend>
+    <input type="radio" name="mode" id="mode-local" value="local" checked><label for="mode-local">Local</label>
+    <input type="radio" name="mode" id="mode-cloud" value="cloud"><label for="mode-cloud">Cloud</label>
+  </fieldset>
+  <div class="cloud-only">
+    <p id="cloud-off" class="notice" hidden>Cloud mode not configured — add <code>OPENROUTER_API_KEY</code> to <code>.env</code> and restart the server.</p>
+    <div class="row" style="margin-bottom:12px">
+      <label for="cmodel" class="mute">Cloud model</label>
+      <select id="cmodel"><option value="">Loading…</option></select>
+    </div>
+  </div>
+  <label id="drop" for="files">Drop up to 5 audio/video files here, or click to choose<br>
+    <span class="mute">.mp3 .wav .m4a .mp4 .aac .ogg .webm .ts .mov, max 1 GB each</span></label>
+  <input id="files" type="file" multiple accept=".mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.ts,.mov">
+  <ul id="picked" aria-label="Selected files"></ul>
+  <div class="row">
+    <label for="uid" class="mute local-only">User ID (optional)</label>
+    <input id="uid" type="text" autocomplete="off" class="local-only">
+    <button id="send" disabled>Transcribe</button>
+    <button id="reset" class="ghost" type="button">Clear selection</button>
+  </div>
+  <p id="up-msg" class="msg" role="status" aria-live="polite"></p>
+  <div id="cloud-results" class="cloud-only" aria-live="polite"></div>
+</section>
+
+<section aria-labelledby="task-h" class="local-only">
+  <h2 id="task-h">Task</h2>
+  <div class="row">
+    <label for="tid" class="mute">Task ID</label>
+    <input id="tid" type="text" list="recent" autocomplete="off">
+    <datalist id="recent"></datalist>
+    <button id="open" class="ghost">Open</button>
+  </div>
+  <p id="task-msg" class="msg" role="status" aria-live="polite"></p>
+  <div id="task"></div>
+</section>
+
+<section aria-labelledby="adm-h" class="local-only">
+  <h2 id="adm-h">Admin</h2>
+  <div class="row">
+    <label for="model" class="mute">Model</label>
+    <input id="model" type="text" list="models" autocomplete="off" placeholder="e.g. turbo">
+    <datalist id="models"><option>tiny</option><option>base</option><option>small</option><option>medium</option><option>large</option><option>turbo</option></datalist>
+    <button id="setmodel">Set model</button>
+  </div>
+  <div class="row" style="margin-top:12px"><button id="clear" class="danger">Clear all tasks…</button></div>
+  <p id="adm-msg" class="msg" role="status" aria-live="polite"></p>
+</section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const EXT = ['.mp3','.wav','.m4a','.mp4','.aac','.ogg','.webm','.ts','.mov'], MAX = 5, GB = 1024 ** 3;
+let picked = [], timer = null;
+
+function errText(d) {
+  if (d == null) return 'Unknown error';
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) return d.map(e => e.msg || JSON.stringify(e)).join('\n'); // pydantic 422
+  return d.message || d.error || JSON.stringify(d);
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let body = null; try { body = await r.json(); } catch {}
+  if (!r.ok) throw new Error(`${r.status}: ${errText(body && body.detail !== undefined ? body.detail : body)}`);
+  return body;
+}
+function say(id, text, bad) { const e = $(id); e.textContent = text; e.className = 'msg ' + (bad ? 'err' : 'okc'); }
+const fmtSize = b => b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : (b / 1e3).toFixed(0) + ' KB';
+const fmtTime = s => { s = Math.round(s); return [Math.floor(s / 3600) + 'h', Math.floor(s % 3600 / 60) + 'm', s % 60 + 's'].join(' '); };
+
+// ---- recent tasks (localStorage, best effort)
+function recent() { try { return JSON.parse(localStorage.getItem('recentTasks')) || []; } catch { return []; } }
+function remember(id) {
+  const list = [id, ...recent().filter(x => x !== id)].slice(0, 10);
+  try { localStorage.setItem('recentTasks', JSON.stringify(list)); } catch {}
+  showRecent();
+}
+function showRecent() { $('recent').replaceChildren(...recent().map(id => Object.assign(document.createElement('option'), { value: id }))); }
+
+// ---- header
+async function refreshHeader() {
+  try {
+    const h = await api('health');
+    $('h-status').textContent = h.status; $('h-gpu').textContent = h.system_gpu || 'none (CPU)';
+    $('h-model').textContent = h.whispermodel; $('h-up').textContent = fmtTime(h.uptime_seconds);
+  } catch (e) { $('h-status').textContent = 'unreachable'; }
+  try {
+    const q = await api('task/queue');
+    const cur = q.current_task && (q.current_task.task_id || q.current_task);
+    $('h-queue').textContent = `${q.queue_length} waiting` + (q.is_processing ? ', busy' : ', idle') + (typeof cur === 'string' ? ` (${cur.slice(0, 8)})` : '');
+  } catch { $('h-queue').textContent = '?'; }
+}
+
+// ---- file picking
+function addFiles(list) {
+  const errs = [];
+  for (const f of list) {
+    const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+    if (!EXT.includes(ext)) errs.push(`${f.name}: unsupported type`);
+    else if (f.size > GB) errs.push(`${f.name}: larger than 1 GB`);
+    else if (f.size === 0) errs.push(`${f.name}: empty file`);
+    else if (picked.length >= MAX) errs.push(`${f.name}: max ${MAX} files`);
+    else if (!picked.some(p => p.name === f.name && p.size === f.size)) picked.push(f);
+  }
+  renderPicked();
+  say('up-msg', errs.join('\n'), errs.length);
+}
+function renderPicked() {
+  $('picked').replaceChildren(...picked.map((f, i) => {
+    const li = document.createElement('li'); li.className = 'row';
+    const b = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Remove', type: 'button' });
+    b.setAttribute('aria-label', 'Remove ' + f.name);
+    b.onclick = () => { picked.splice(i, 1); renderPicked(); };
+    li.append(`${f.name} (${fmtSize(f.size)}) `, b); return li;
+  }));
+  $('send').disabled = !picked.length || (document.body.classList.contains('cloud') && !(cloudReady && $('cmodel').value));
+}
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+$('files').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('reset').onclick = () => { picked = []; renderPicked(); say('up-msg', ''); };
+
+$('send').onclick = async () => {
+  if (mode() === 'cloud') return sendCloud();
+  const fd = new FormData();
+  picked.forEach(f => fd.append('files', f));
+  if ($('uid').value.trim()) fd.append('user_id', $('uid').value.trim());
+  $('send').disabled = true; say('up-msg', 'Uploading…');
+  try {
+    const r = await api('transcribe', { method: 'POST', body: fd });
+    say('up-msg', r.message);
+    picked = []; renderPicked();
+    openTask(r.task_id);
+  } catch (e) { say('up-msg', e.message, true); $('send').disabled = false; }
+};
+
+// ---- task view
+function download(name, text) {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: name.replace(/\.[^.]+$/, '') + '.txt' });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function transcriptBlock(name, text, metaText) {
+  const meta = document.createElement('div'); meta.className = 'mute'; meta.textContent = metaText;
+  const pre = document.createElement('pre'); pre.textContent = text || '';
+  pre.tabIndex = 0; pre.setAttribute('aria-label', `Transcript of ${name}`);
+  const copy = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Copy' });
+  copy.onclick = async () => { try { await navigator.clipboard.writeText(pre.textContent); copy.textContent = 'Copied'; } catch { copy.textContent = 'Copy failed'; } setTimeout(() => copy.textContent = 'Copy', 1500); };
+  const dl = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Download .txt' });
+  dl.onclick = () => download(name, pre.textContent);
+  const row = document.createElement('div'); row.className = 'row'; row.append(copy, dl);
+  return [meta, pre, row];
+}
+function renderTask(t) {
+  const results = Object.fromEntries((t.completed_results || []).map(r => [r.file_index, r]));
+  const s = t.summary;
+  const box = $('task'); box.replaceChildren();
+  const head = document.createElement('p');
+  head.textContent = `${s.overall_status} · ${s.overall_progress}% · ${s.completed}/${s.total_files} done` + (s.failed ? `, ${s.failed} failed` : '');
+  box.append(head);
+  for (const f of t.files) {
+    const d = document.createElement('div'); d.className = 'file';
+    const h = document.createElement('h3'); h.textContent = f.file_name;
+    const p = document.createElement('progress'); p.max = 100; p.value = f.progress;
+    p.setAttribute('aria-label', `${f.file_name} progress`);
+    const st = document.createElement('div'); st.className = 'mute'; st.textContent = `${f.status} · ${f.progress}%`;
+    d.append(h, p, st);
+    if (f.error) { const e = document.createElement('div'); e.className = 'err'; e.textContent = f.error; d.append(e); }
+    const r = results[f.file_index];
+    if (r) d.append(...transcriptBlock(f.file_name, r.transcription,
+      [r.language && 'Language: ' + r.language, r.duration && 'Duration: ' + fmtTime(r.duration)].filter(Boolean).join(' · ')));
+    box.append(d);
+  }
+}
+async function poll(id) {
+  try {
+    const t = await api('task/status/' + encodeURIComponent(id));
+    renderTask(t);
+    const done = ['completed', 'failed'].includes(t.summary.overall_status);
+    say('task-msg', done ? `Task ${t.summary.overall_status}.` : 'Processing…');
+    if (!done) timer = setTimeout(() => poll(id), 2000);
+  } catch (e) { say('task-msg', e.message, true); }
+}
+function openTask(id) {
+  id = id.trim(); if (!id) return;
+  clearTimeout(timer); $('tid').value = id; $('task').replaceChildren();
+  remember(id); say('task-msg', 'Loading…'); poll(id);
+}
+$('open').onclick = () => openTask($('tid').value);
+$('tid').onkeydown = e => { if (e.key === 'Enter') openTask($('tid').value); };
+
+// ---- admin
+$('setmodel').onclick = async () => {
+  const name = $('model').value.trim(); if (!name) return say('adm-msg', 'Enter a model name.', true);
+  $('setmodel').disabled = true; say('adm-msg', `Loading ${name}… this can take a while.`);
+  try {
+    const r = await api('model/set', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_name: name }) });
+    say('adm-msg', r.message || 'Model set.'); refreshHeader();
+  } catch (e) { say('adm-msg', e.message, true); }
+  $('setmodel').disabled = false;
+};
+$('clear').onclick = async () => {
+  if (!confirm('Delete ALL tasks and results? This cannot be undone.')) return;
+  try {
+    const r = await api('admin/clear-all', { method: 'DELETE' });
+    say('adm-msg', 'Cleared: ' + JSON.stringify(r));
+    clearTimeout(timer); $('task').replaceChildren(); say('task-msg', '');
+    try { localStorage.removeItem('recentTasks'); } catch {}
+    showRecent(); refreshHeader();
+  } catch (e) { say('adm-msg', e.message, true); }
+};
+
+// ---- cloud mode
+const mode = () => document.querySelector('input[name=mode]:checked').value;
+let cloudReady = false, cloudLoaded = false;
+function setMode(m) {
+  $('mode-' + m).checked = true;
+  document.body.classList.toggle('cloud', m === 'cloud');
+  try { localStorage.setItem('mode', m); } catch {}
+  if (m === 'cloud' && !cloudLoaded) loadCloud();
+  renderPicked();
+}
+document.querySelectorAll('input[name=mode]').forEach(i => i.onchange = () => setMode(i.value));
+$('cmodel').onchange = () => renderPicked();
+async function loadCloud() {
+  cloudLoaded = true;
+  const sel = $('cmodel');
+  try {
+    const s = await api('cloud/status');
+    cloudReady = s.configured; $('cloud-off').hidden = s.configured;
+    if (!s.configured) { sel.replaceChildren(new Option('Unavailable', '')); sel.disabled = true; return renderPicked(); }
+    const m = await api('cloud/models');
+    sel.replaceChildren(...m.models.map(x => new Option(`${x.name} (${x.id})`, x.id)));
+    if (m.default_model) sel.value = m.default_model;
+    sel.disabled = false;
+  } catch (e) { cloudLoaded = false; sel.replaceChildren(new Option('Failed to load', '')); say('up-msg', e.message, true); }
+  renderPicked();
+}
+async function sendCloud() {
+  const fd = new FormData();
+  picked.forEach(f => fd.append('files', f));
+  fd.append('model', $('cmodel').value);
+  $('send').disabled = true; say('up-msg', 'Uploading and transcribing via OpenRouter… this can take a while.');
+  try {
+    const rows = await api('cloud/transcribe', { method: 'POST', body: fd });
+    const box = $('cloud-results'); box.replaceChildren();
+    for (const r of rows) {
+      const d = document.createElement('div'); d.className = 'file';
+      const h = document.createElement('h3'); h.textContent = r.file_name; d.append(h);
+      if (r.error) { const e = document.createElement('div'); e.className = 'err'; e.textContent = r.error; d.append(e); }
+      else d.append(...transcriptBlock(r.file_name, r.transcription, 'Model: ' + r.model));
+      box.append(d);
+    }
+    const bad = rows.filter(r => r.error).length;
+    say('up-msg', `Done: ${rows.length - bad} transcribed` + (bad ? `, ${bad} failed` : ''), bad);
+    picked = []; renderPicked();
+  } catch (e) { say('up-msg', e.message, true); renderPicked(); }
+}
+let savedMode = 'local'; try { savedMode = localStorage.getItem('mode') === 'cloud' ? 'cloud' : 'local'; } catch {}
+setMode(savedMode);
+
+showRecent(); refreshHeader(); setInterval(refreshHeader, 10000);
+if (recent()[0]) $('tid').value = recent()[0];
+</script>
+</body>
+</html>

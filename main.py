@@ -10,6 +10,7 @@ from endpoints.set import router as set_model_router
 from endpoints.root import router as root_router
 from endpoints.status import router as status_router
 from endpoints.admin import router as admin_router
+from endpoints.cloud import router as cloud_router
 
 API_VERSION = "1.0.0"
 
@@ -57,3 +58,4 @@ app.include_router(set_model_router, prefix="/model")
 app.include_router(transcribe_router)
 app.include_router(status_router, prefix="/task", tags=["Task Management"])
 app.include_router(admin_router, prefix="/admin")
+app.include_router(cloud_router, prefix="/cloud")
