@@ -1,571 +1,255 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TranscrAIb API - Test Interface</title>
-    <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            max-width: 900px; 
-            margin: 20px auto; 
-            padding: 20px; 
-            background-color: #f5f5f5; 
-            line-height: 1.6;
-        }
-        .container { 
-            background: white; 
-            padding: 30px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
-        }
-        h1 { 
-            color: #333; 
-            text-align: center; 
-            margin-bottom: 30px;
-            font-size: 2.2em;
-        }
-        .upload-box { 
-            border: 2px dashed #007bff; 
-            padding: 30px; 
-            text-align: center; 
-            margin: 20px 0; 
-            border-radius: 8px; 
-            transition: border-color 0.3s ease;
-        }
-        .upload-box:hover {
-            border-color: #0056b3;
-            background-color: #f8f9ff;
-        }
-        input[type="file"] { 
-            margin: 15px 0; 
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            width: 100%;
-            max-width: 400px;
-        }
-        button { 
-            background: #007bff; 
-            color: white; 
-            border: none; 
-            padding: 12px 24px; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            margin: 5px;
-        }
-        button:hover { 
-            background: #0056b3; 
-            transform: translateY(-1px);
-        }
-        button:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .task-overview { 
-            margin-top: 20px; 
-            padding: 20px; 
-            background: #f8f9fa; 
-            border-radius: 8px; 
-            display: none; 
-        }
-        .overall-progress {
-            width: 100%;
-            height: 25px;
-            background: #e9ecef;
-            border-radius: 12px;
-            overflow: hidden;
-            margin: 15px 0;
-            position: relative;
-        }
-        .overall-progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #007bff, #0056b3);
-            transition: width 0.5s ease;
-            position: relative;
-        }
-        .progress-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-weight: bold;
-            font-size: 12px;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-        }
-        .file-list {
-            margin-top: 20px;
-        }
-        .file-item {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            transition: all 0.3s ease;
-        }
-        .file-item.completed {
-            border-left: 5px solid #28a745;
-            background: #f8fff9;
-        }
-        .file-item.processing {
-            border-left: 5px solid #007bff;
-            background: #f8f9ff;
-        }
-        .file-item.failed {
-            border-left: 5px solid #dc3545;
-            background: #fff8f8;
-        }
-        .file-item.pending {
-            border-left: 5px solid #ffc107;
-            background: #fffef8;
-        }
-        .file-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .file-name {
-            font-weight: 600;
-            color: #333;
-            font-size: 16px;
-        }
-        .file-status {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-processing { background: #d1ecf1; color: #0c5460; }
-        .status-completed { background: #d4edda; color: #155724; }
-        .status-failed { background: #f8d7da; color: #721c24; }
-        .file-progress {
-            width: 100%;
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-        .file-progress-bar {
-            height: 100%;
-            background: #007bff;
-            transition: width 0.3s ease;
-            border-radius: 4px;
-        }
-        .file-progress-bar.completed { background: #28a745; }
-        .file-progress-bar.failed { background: #dc3545; }
-        .transcription-result {
-            margin-top: 15px;
-            padding: 15px;
-            background: #f1f8ff;
-            border-radius: 6px;
-            border-left: 4px solid #007bff;
-        }
-        .transcription-text {
-            font-style: italic;
-            line-height: 1.5;
-            color: #333;
-            margin-top: 10px;
-        }
-        .error-message {
-            margin-top: 10px;
-            padding: 10px;
-            background: #f8d7da;
-            color: #721c24;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        .debug-section { 
-            margin-top: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .debug { 
-            background: #e9ecef; 
-            padding: 8px 12px; 
-            margin: 5px 0; 
-            border-radius: 4px; 
-            font-family: 'Courier New', monospace; 
-            font-size: 11px;
-            border-left: 3px solid #6c757d;
-        }
-        .actions {
-            margin-top: 20px;
-            text-align: center;
-        }
-        .btn-secondary {
-            background: #6c757d;
-        }
-        .btn-secondary:hover {
-            background: #545b62;
-        }
-        .btn-danger {
-            background: #dc3545;
-        }
-        .btn-danger:hover {
-            background: #c82333;
-        }
-        .summary-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 15px;
-            margin: 15px 0;
-        }
-        .stat-card {
-            background: white;
-            padding: 15px;
-            border-radius: 6px;
-            text-align: center;
-            border: 1px solid #dee2e6;
-        }
-        .stat-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #007bff;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: #6c757d;
-            text-transform: uppercase;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whisper Transcribe</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1b1f24;--mute:#5d6672;--line:#d9dde3;--acc:#2f6fdb;--ok:#1f8a4c;--bad:#c62f2f;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#121417;--card:#1b1e23;--fg:#e6e8eb;--mute:#9aa3ad;--line:#30353c;--acc:#6b9cff;--ok:#4cc27e;--bad:#ff6b6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px;display:grid;gap:16px}
+section,header{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+h1{font-size:1.3rem;margin:0 0 8px}h2{font-size:1.05rem;margin:0 0 12px}
+dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0}
+dt{color:var(--mute);font-size:.8rem}dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=text]{flex:1;min-width:0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:inherit;font:inherit}
+button{padding:8px 14px;border:1px solid var(--acc);border-radius:6px;background:var(--acc);color:#fff;font:inherit;cursor:pointer}
+button.ghost{background:transparent;color:var(--acc)}button.danger{border-color:var(--bad);background:transparent;color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;color:var(--mute)}
+#drop.over{border-color:var(--acc);color:var(--acc)}
+#files{position:absolute;opacity:0;width:1px;height:1px}
+ul{list-style:none;padding:0;margin:12px 0}
+li{padding:6px 0;border-bottom:1px solid var(--line)}
+.msg{min-height:1.2em;margin:8px 0 0}.err{color:var(--bad);white-space:pre-wrap}.okc{color:var(--ok)}
+progress{width:100%;height:10px}
+.file{border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:12px}
+.file h3{font-size:.95rem;margin:0 0 6px;overflow-wrap:anywhere}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:10px;border-radius:6px;max-height:320px;overflow:auto;margin:8px 0}
+.mute{color:var(--mute);font-size:.85rem}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎵 TranscrAIb API Test Interface</h1>
-        
-        <div class="upload-box">
-            <h3>📁 Upload Audio/Video Files</h3>
-            <p>Select multiple files for batch transcription</p>
-            <input type="file" id="files" multiple accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.ts,.mov">
-            <br>
-            <button onclick="uploadFiles()" id="uploadBtn">Upload & Transcribe</button>
-        </div>
+<main>
+<header>
+  <h1>Whisper Transcribe</h1>
+  <dl aria-live="polite">
+    <div><dt>Status</dt><dd id="h-status">…</dd></div>
+    <div><dt>GPU</dt><dd id="h-gpu">…</dd></div>
+    <div><dt>Model</dt><dd id="h-model">…</dd></div>
+    <div><dt>Uptime</dt><dd id="h-up">…</dd></div>
+    <div><dt>Queue</dt><dd id="h-queue">…</dd></div>
+  </dl>
+</header>
 
-        <!-- Task Overview Section -->
-        <div class="task-overview" id="taskOverview">
-            <h3>📊 Task Progress</h3>
-            <div id="taskId"></div>
-            
-            <!-- Overall Progress -->
-            <div class="overall-progress">
-                <div class="overall-progress-bar" id="overallProgressBar">
-                    <div class="progress-text" id="overallProgressText">0%</div>
-                </div>
-            </div>
-            
-            <!-- Summary Stats -->
-            <div class="summary-stats" id="summaryStats">
-                <div class="stat-card">
-                    <div class="stat-number" id="totalFiles">0</div>
-                    <div class="stat-label">Total Files</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="completedFiles">0</div>
-                    <div class="stat-label">Completed</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="processingFiles">0</div>
-                    <div class="stat-label">Processing</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="failedFiles">0</div>
-                    <div class="stat-label">Failed</div>
-                </div>
-            </div>
+<section aria-labelledby="up-h">
+  <h2 id="up-h">Upload</h2>
+  <label id="drop" for="files">Drop up to 5 audio/video files here, or click to choose<br>
+    <span class="mute">.mp3 .wav .m4a .mp4 .aac .ogg .webm .ts .mov, max 1 GB each</span></label>
+  <input id="files" type="file" multiple accept=".mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.ts,.mov">
+  <ul id="picked" aria-label="Selected files"></ul>
+  <div class="row">
+    <label for="uid" class="mute">User ID (optional)</label>
+    <input id="uid" type="text" autocomplete="off">
+    <button id="send" disabled>Transcribe</button>
+    <button id="reset" class="ghost" type="button">Clear selection</button>
+  </div>
+  <p id="up-msg" class="msg" role="status" aria-live="polite"></p>
+</section>
 
-            <!-- Individual File Progress -->
-            <div class="file-list" id="fileList"></div>
+<section aria-labelledby="task-h">
+  <h2 id="task-h">Task</h2>
+  <div class="row">
+    <label for="tid" class="mute">Task ID</label>
+    <input id="tid" type="text" list="recent" autocomplete="off">
+    <datalist id="recent"></datalist>
+    <button id="open" class="ghost">Open</button>
+  </div>
+  <p id="task-msg" class="msg" role="status" aria-live="polite"></p>
+  <div id="task"></div>
+</section>
 
-            <!-- Actions -->
-            <div class="actions">
-                <button onclick="pollTaskStatus()" class="btn-secondary">🔄 Refresh Status</button>
-                <button onclick="clearAll()" class="btn-danger">🗑️ Clear All</button>
-                <button onclick="downloadResults()" id="downloadBtn" style="display: none;">💾 Download Results</button>
-            </div>
-        </div>
+<section aria-labelledby="adm-h">
+  <h2 id="adm-h">Admin</h2>
+  <div class="row">
+    <label for="model" class="mute">Model</label>
+    <input id="model" type="text" list="models" autocomplete="off" placeholder="e.g. turbo">
+    <datalist id="models"><option>tiny</option><option>base</option><option>small</option><option>medium</option><option>large</option><option>turbo</option></datalist>
+    <button id="setmodel">Set model</button>
+  </div>
+  <div class="row" style="margin-top:12px"><button id="clear" class="danger">Clear all tasks…</button></div>
+  <p id="adm-msg" class="msg" role="status" aria-live="polite"></p>
+</section>
+</main>
 
-        <!-- Debug Section -->
-        <div class="debug-section">
-            <h4>🔍 Debug Log</h4>
-            <div id="debugLog"></div>
-        </div>
-    </div>
+<script>
+const $ = id => document.getElementById(id);
+const EXT = ['.mp3','.wav','.m4a','.mp4','.aac','.ogg','.webm','.ts','.mov'], MAX = 5, GB = 1024 ** 3;
+let picked = [], timer = null;
 
-    <script>
-        let currentTaskId = null;
-        let pollingInterval = null;
-        let taskData = null;
+function errText(d) {
+  if (d == null) return 'Unknown error';
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) return d.map(e => e.msg || JSON.stringify(e)).join('\n'); // pydantic 422
+  return d.message || d.error || JSON.stringify(d);
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let body = null; try { body = await r.json(); } catch {}
+  if (!r.ok) throw new Error(`${r.status}: ${errText(body && body.detail !== undefined ? body.detail : body)}`);
+  return body;
+}
+function say(id, text, bad) { const e = $(id); e.textContent = text; e.className = 'msg ' + (bad ? 'err' : 'okc'); }
+const fmtSize = b => b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : (b / 1e3).toFixed(0) + ' KB';
+const fmtTime = s => { s = Math.round(s); return [Math.floor(s / 3600) + 'h', Math.floor(s % 3600 / 60) + 'm', s % 60 + 's'].join(' '); };
 
-        // Upload files and start transcription
-        async function uploadFiles() {
-            const files = document.getElementById('files').files;
-            if (!files.length) {
-                addDebug('❌ No files selected');
-                alert('Please select files first');
-                return;
-            }
+// ---- recent tasks (localStorage, best effort)
+function recent() { try { return JSON.parse(localStorage.getItem('recentTasks')) || []; } catch { return []; } }
+function remember(id) {
+  const list = [id, ...recent().filter(x => x !== id)].slice(0, 10);
+  try { localStorage.setItem('recentTasks', JSON.stringify(list)); } catch {}
+  showRecent();
+}
+function showRecent() { $('recent').replaceChildren(...recent().map(id => Object.assign(document.createElement('option'), { value: id }))); }
 
-            // Disable upload button
-            document.getElementById('uploadBtn').disabled = true;
-            document.getElementById('uploadBtn').textContent = 'Uploading...';
+// ---- header
+async function refreshHeader() {
+  try {
+    const h = await api('health');
+    $('h-status').textContent = h.status; $('h-gpu').textContent = h.system_gpu || 'none (CPU)';
+    $('h-model').textContent = h.whispermodel; $('h-up').textContent = fmtTime(h.uptime_seconds);
+  } catch (e) { $('h-status').textContent = 'unreachable'; }
+  try {
+    const q = await api('task/queue');
+    const cur = q.current_task && (q.current_task.task_id || q.current_task);
+    $('h-queue').textContent = `${q.queue_length} waiting` + (q.is_processing ? ', busy' : ', idle') + (typeof cur === 'string' ? ` (${cur.slice(0, 8)})` : '');
+  } catch { $('h-queue').textContent = '?'; }
+}
 
-            const formData = new FormData();
-            for (let file of files) {
-                formData.append('files', file);
-            }
+// ---- file picking
+function addFiles(list) {
+  const errs = [];
+  for (const f of list) {
+    const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+    if (!EXT.includes(ext)) errs.push(`${f.name}: unsupported type`);
+    else if (f.size > GB) errs.push(`${f.name}: larger than 1 GB`);
+    else if (f.size === 0) errs.push(`${f.name}: empty file`);
+    else if (picked.length >= MAX) errs.push(`${f.name}: max ${MAX} files`);
+    else if (!picked.some(p => p.name === f.name && p.size === f.size)) picked.push(f);
+  }
+  renderPicked();
+  say('up-msg', errs.join('\n'), errs.length);
+}
+function renderPicked() {
+  $('picked').replaceChildren(...picked.map((f, i) => {
+    const li = document.createElement('li'); li.className = 'row';
+    const b = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Remove', type: 'button' });
+    b.setAttribute('aria-label', 'Remove ' + f.name);
+    b.onclick = () => { picked.splice(i, 1); renderPicked(); };
+    li.append(`${f.name} (${fmtSize(f.size)}) `, b); return li;
+  }));
+  $('send').disabled = !picked.length;
+}
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+$('files').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('reset').onclick = () => { picked = []; renderPicked(); say('up-msg', ''); };
 
-            try {
-                addDebug(`📤 Uploading ${files.length} files...`);
-                
-                const response = await fetch('/transcribe', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    currentTaskId = result.task_id;
-                    addDebug(`✅ Upload successful! Task ID: ${currentTaskId}`);
-                    
-                    // Show task overview
-                    document.getElementById('taskOverview').style.display = 'block';
-                    document.getElementById('taskId').innerHTML = `<strong>Task ID:</strong> ${currentTaskId}`;
-                    
-                    // Start polling for progress
-                    startPolling();
-                } else {
-                    addDebug(`❌ Upload failed: ${JSON.stringify(result)}`);
-                    alert(`Upload failed: ${result.detail?.message || result.detail}`);
-                }
-            } catch (error) {
-                addDebug(`❌ Upload error: ${error.message}`);
-                alert(`Upload failed: ${error.message}`);
-            } finally {
-                // Re-enable upload button
-                document.getElementById('uploadBtn').disabled = false;
-                document.getElementById('uploadBtn').textContent = 'Upload & Transcribe';
-            }
-        }
+$('send').onclick = async () => {
+  const fd = new FormData();
+  picked.forEach(f => fd.append('files', f));
+  if ($('uid').value.trim()) fd.append('user_id', $('uid').value.trim());
+  $('send').disabled = true; say('up-msg', 'Uploading…');
+  try {
+    const r = await api('transcribe', { method: 'POST', body: fd });
+    say('up-msg', r.message);
+    picked = []; renderPicked();
+    openTask(r.task_id);
+  } catch (e) { say('up-msg', e.message, true); $('send').disabled = false; }
+};
 
-        // Start polling for task status
-        function startPolling() {
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-            }
-            
-            // Poll immediately, then every 2 seconds
-            pollTaskStatus();
-            pollingInterval = setInterval(pollTaskStatus, 2000);
-        }
+// ---- task view
+function download(name, text) {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: name.replace(/\.[^.]+$/, '') + '.txt' });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function renderTask(t) {
+  const results = Object.fromEntries((t.completed_results || []).map(r => [r.file_index, r]));
+  const s = t.summary;
+  const box = $('task'); box.replaceChildren();
+  const head = document.createElement('p');
+  head.textContent = `${s.overall_status} · ${s.overall_progress}% · ${s.completed}/${s.total_files} done` + (s.failed ? `, ${s.failed} failed` : '');
+  box.append(head);
+  for (const f of t.files) {
+    const d = document.createElement('div'); d.className = 'file';
+    const h = document.createElement('h3'); h.textContent = f.file_name;
+    const p = document.createElement('progress'); p.max = 100; p.value = f.progress;
+    p.setAttribute('aria-label', `${f.file_name} progress`);
+    const st = document.createElement('div'); st.className = 'mute'; st.textContent = `${f.status} · ${f.progress}%`;
+    d.append(h, p, st);
+    if (f.error) { const e = document.createElement('div'); e.className = 'err'; e.textContent = f.error; d.append(e); }
+    const r = results[f.file_index];
+    if (r) {
+      const meta = document.createElement('div'); meta.className = 'mute';
+      meta.textContent = [r.language && 'Language: ' + r.language, r.duration && 'Duration: ' + fmtTime(r.duration)].filter(Boolean).join(' · ');
+      const pre = document.createElement('pre'); pre.textContent = r.transcription || '';
+      pre.tabIndex = 0; pre.setAttribute('aria-label', `Transcript of ${f.file_name}`);
+      const copy = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Copy' });
+      copy.onclick = async () => { try { await navigator.clipboard.writeText(pre.textContent); copy.textContent = 'Copied'; } catch { copy.textContent = 'Copy failed'; } setTimeout(() => copy.textContent = 'Copy', 1500); };
+      const dl = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Download .txt' });
+      dl.onclick = () => download(f.file_name, pre.textContent);
+      const row = document.createElement('div'); row.className = 'row'; row.append(copy, dl);
+      d.append(meta, pre, row);
+    }
+    box.append(d);
+  }
+}
+async function poll(id) {
+  try {
+    const t = await api('task/status/' + encodeURIComponent(id));
+    renderTask(t);
+    const done = ['completed', 'failed'].includes(t.summary.overall_status);
+    say('task-msg', done ? `Task ${t.summary.overall_status}.` : 'Processing…');
+    if (!done) timer = setTimeout(() => poll(id), 2000);
+  } catch (e) { say('task-msg', e.message, true); }
+}
+function openTask(id) {
+  id = id.trim(); if (!id) return;
+  clearTimeout(timer); $('tid').value = id; $('task').replaceChildren();
+  remember(id); say('task-msg', 'Loading…'); poll(id);
+}
+$('open').onclick = () => openTask($('tid').value);
+$('tid').onkeydown = e => { if (e.key === 'Enter') openTask($('tid').value); };
 
-        // Stop polling
-        function stopPolling() {
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-                pollingInterval = null;
-            }
-        }
+// ---- admin
+$('setmodel').onclick = async () => {
+  const name = $('model').value.trim(); if (!name) return say('adm-msg', 'Enter a model name.', true);
+  $('setmodel').disabled = true; say('adm-msg', `Loading ${name}… this can take a while.`);
+  try {
+    const r = await api('model/set', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_name: name }) });
+    say('adm-msg', r.message || 'Model set.'); refreshHeader();
+  } catch (e) { say('adm-msg', e.message, true); }
+  $('setmodel').disabled = false;
+};
+$('clear').onclick = async () => {
+  if (!confirm('Delete ALL tasks and results? This cannot be undone.')) return;
+  try {
+    const r = await api('admin/clear-all', { method: 'POST' });
+    say('adm-msg', 'Cleared: ' + JSON.stringify(r));
+    clearTimeout(timer); $('task').replaceChildren(); say('task-msg', '');
+    try { localStorage.removeItem('recentTasks'); } catch {}
+    showRecent(); refreshHeader();
+  } catch (e) { say('adm-msg', e.message, true); }
+};
 
-        // Poll task status and update UI
-        async function pollTaskStatus() {
-            if (!currentTaskId) return;
-
-            try {
-                const response = await fetch(`/task/status/${currentTaskId}`);
-                
-                if (!response.ok) {
-                    addDebug(`❌ Status check failed: ${response.status}`);
-                    return;
-                }
-
-                taskData = await response.json();
-                addDebug(`📊 Status update: ${taskData.summary.overall_status} (${taskData.summary.overall_progress}%)`);
-                
-                updateTaskOverview(taskData);
-                updateFileList(taskData.files);
-                
-                // Check if all files are done
-                const allDone = taskData.files.every(f => 
-                    f.status === 'completed' || f.status === 'failed'
-                );
-                
-                if (allDone) {
-                    addDebug('🎉 All files completed!');
-                    stopPolling();
-                    document.getElementById('downloadBtn').style.display = 'inline-block';
-                }
-                
-            } catch (error) {
-                addDebug(`❌ Polling error: ${error.message}`);
-            }
-        }
-
-        // Update task overview section
-        function updateTaskOverview(data) {
-            const summary = data.summary;
-            
-            // Update overall progress
-            const progressBar = document.getElementById('overallProgressBar');
-            const progressText = document.getElementById('overallProgressText');
-            
-            progressBar.style.width = `${summary.overall_progress}%`;
-            progressText.textContent = `${summary.overall_progress}%`;
-            
-            // Update stats
-            document.getElementById('totalFiles').textContent = summary.total_files;
-            document.getElementById('completedFiles').textContent = summary.completed;
-            document.getElementById('processingFiles').textContent = summary.processing;
-            document.getElementById('failedFiles').textContent = summary.failed;
-        }
-
-        // Update individual file list
-        function updateFileList(files) {
-            const fileListContainer = document.getElementById('fileList');
-            
-            fileListContainer.innerHTML = files.map(file => `
-                <div class="file-item ${file.status}" id="file-${file.file_index}">
-                    <div class="file-header">
-                        <div class="file-name">📄 ${file.filename}</div>
-                        <div class="file-status status-${file.status}">${file.status}</div>
-                    </div>
-                    
-                    <div class="file-progress">
-                        <div class="file-progress-bar ${file.status}" style="width: ${file.progress}%"></div>
-                    </div>
-                    
-                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
-                        Progress: ${file.progress}% | Index: ${file.file_index}
-                    </div>
-                    
-                    ${file.result ? `
-                        <div class="transcription-result">
-                            <strong>🎯 Transcription Result:</strong>
-                            <div class="transcription-text">"${file.result.transcription}"</div>
-                            ${file.result.language ? `<div style="margin-top: 10px;"><strong>Language:</strong> ${file.result.language}</div>` : ''}
-                            ${file.result.duration ? `<div><strong>Duration:</strong> ${file.result.duration}s</div>` : ''}
-                        </div>
-                    ` : ''}
-                    
-                    ${file.error ? `
-                        <div class="error-message">
-                            <strong>❌ Error:</strong> ${file.error}
-                        </div>
-                    ` : ''}
-                </div>
-            `).join('');
-        }
-
-        // Clear all tasks
-        async function clearAll() {
-            if (!confirm('Are you sure you want to clear all tasks? This cannot be undone.')) {
-                return;
-            }
-
-            try {
-                addDebug('🗑️ Clearing all tasks...');
-                
-                const response = await fetch('/admin/clear-all', {
-                    method: 'DELETE'
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    addDebug(`✅ Cleared ${result.deleted_counts.deleted_tasks} tasks and ${result.deleted_counts.deleted_files} files`);
-                    
-                    // Reset UI
-                    currentTaskId = null;
-                    taskData = null;
-                    stopPolling();
-                    document.getElementById('taskOverview').style.display = 'none';
-                    document.getElementById('downloadBtn').style.display = 'none';
-                    
-                } else {
-                    addDebug(`❌ Clear failed: ${JSON.stringify(result)}`);
-                    alert('Failed to clear tasks');
-                }
-            } catch (error) {
-                addDebug(`❌ Clear error: ${error.message}`);
-                alert(`Clear failed: ${error.message}`);
-            }
-        }
-
-        // Download results as JSON
-        function downloadResults() {
-            if (!taskData) return;
-
-            const results = {
-                task_id: currentTaskId,
-                summary: taskData.summary,
-                files: taskData.files.map(file => ({
-                    filename: file.filename,
-                    status: file.status,
-                    transcription: file.result?.transcription || null,
-                    language: file.result?.language || null,
-                    duration: file.result?.duration || null,
-                    error: file.error || null
-                }))
-            };
-
-            const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `transcription-results-${currentTaskId}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            addDebug('💾 Results downloaded');
-        }
-
-        // Add debug message
-        function addDebug(message) {
-            const debugLog = document.getElementById('debugLog');
-            const timestamp = new Date().toLocaleTimeString();
-            const debugEntry = document.createElement('div');
-            debugEntry.className = 'debug';
-            debugEntry.textContent = `[${timestamp}] ${message}`;
-            debugLog.appendChild(debugEntry);
-            debugLog.scrollTop = debugLog.scrollHeight;
-        }
-
-        // Check queue info on page load
-        window.onload = async function() {
-            addDebug('🚀 Interface loaded');
-            
-            try {
-                const response = await fetch('/task/queue');
-                const queueInfo = await response.json();
-                addDebug(`📋 Queue info: ${queueInfo.queue_length} pending, processing: ${queueInfo.is_processing}`);
-                
-                if (queueInfo.current_task_id) {
-                    addDebug(`⚡ Found active task: ${queueInfo.current_task_id}`);
-                }
-            } catch (error) {
-                addDebug(`⚠️ Could not fetch queue info: ${error.message}`);
-            }
-        };
-
-        // Cleanup on page unload
-        window.onbeforeunload = function() {
-            stopPolling();
-        };
-    </script>
+showRecent(); refreshHeader(); setInterval(refreshHeader, 10000);
+if (recent()[0]) $('tid').value = recent()[0];
+</script>
 </body>
 </html>
