@@ -1,72 +1,59 @@
+import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-import whisper, time, os
-from database.task_database import TaskDatabase
 from task_management import task_manager
-from hardware_utils import detect_hardware, model_pick
-from endpoints.health import create_health_endpoint
-from endpoints.transcribe import create_transcribe_endpoint
-from endpoints.set import create_model_endpoint
+from hardware_utils import detect_hardware, model_pick, load_model
+from endpoints.health import router as health_router
+from endpoints.transcribe import router as transcribe_router
+from endpoints.set import router as set_model_router
 from endpoints.root import router as root_router
 from endpoints.status import router as status_router
+from endpoints.admin import router as admin_router
 
-# API Configuration 
 API_VERSION = "1.0.0"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Detecting hardware...")
+    hw = detect_hardware()
+    print("Hardware Info:", hw)
+    if hw["gpu_count"] == 0:
+        print("Warning: No GPU detected, transcription will use CPU, this may be slow.")
+
+    name, gpu = model_pick(hw)
+    print("Selected Model:", name)
+    model, gpu = load_model(name, hw, gpu)
+    task_manager.hw = hw
+    task_manager.gpu = gpu
+    task_manager.start_time = time.time()
+    task_manager.api_version = API_VERSION
+    task_manager.set_model(model, name)
+
+    print("Cleared existing tasks from previous sessions:", task_manager.clear_all())
+    print("Transcription API Ready")
+    yield
+
+
 app = FastAPI(
-    title="Whisper Transcription API", 
+    title="Whisper Transcription API",
     version=API_VERSION,
-    description="Audio/Video transcription API with queue management"
+    description="Audio/Video transcription API with queue management",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
-def main():
-    db = TaskDatabase()
-    
-    # Log & Hardware Detection
-    print("Detecting hardware...")
-    HW = detect_hardware()
-    print("Hardware Info:", HW)
-    
-    if HW["gpu_count"] == 0:
-        print("Warning: No GPU detected, Transcription will utilize CPU, this may be slow.")
-        
-    # Load Whisper Model based on hardware
-    MODEL_NAME, GPU = model_pick(HW)
-    print("Selected Model:", MODEL_NAME)
-    model = whisper.load_model(MODEL_NAME, device="cuda" if GPU else "cpu")
-    
-    # Default a model globally in task_manager (based on initial hardware detection)
-    task_manager.set_model(model, MODEL_NAME)
-
-    # Clear any existing tasks from previous sessions
-    db.clear_all()
-    print("Cleared existing tasks from previous sessions.")
-    
-    START_TIME = time.time()
-
-    # Initialize the endpoints with dependencies
-    health_router = create_health_endpoint(HW, START_TIME, API_VERSION)
-    transcribe_router = create_transcribe_endpoint(model, MODEL_NAME)
-    set_model_router = create_model_endpoint(HW, MODEL_NAME, GPU)
-
-    # Include the routers and endpoints
-    app.include_router(health_router)
-    app.include_router(root_router)
-    app.include_router(set_model_router, prefix="/model")
-    app.include_router(transcribe_router)
-    app.include_router(status_router, prefix="/task", tags=["Task Management"])
-
-    
-    print("Whisper Transcription API Ready")
-    return app
-    
-app = main()
-
+app.include_router(health_router)
+app.include_router(root_router)
+app.include_router(set_model_router, prefix="/model")
+app.include_router(transcribe_router)
+app.include_router(status_router, prefix="/task", tags=["Task Management"])
+app.include_router(admin_router, prefix="/admin")

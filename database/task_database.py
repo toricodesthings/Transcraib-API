@@ -169,7 +169,7 @@ class TaskDatabase:
             cursor = conn.cursor()
             
             cursor.execute('''
-                SELECT task_id, file_index, filename, transcription, language, 
+                SELECT task_id, file_index, file_name, transcription, language, 
                        duration, completed_at
                 FROM task_files 
                 WHERE status = ? AND completed_at IS NOT NULL
@@ -244,6 +244,13 @@ class TaskDatabase:
             
             return cursor.fetchone()[0]
         
+    def pending_file_paths(self) -> List[str]:
+        """Temp paths of files not yet processed (processed files are already deleted)."""
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute("SELECT file_path FROM task_files WHERE status IN (?, ?)",
+                                (FileStatus.PENDING.value, FileStatus.PROCESSING.value)).fetchall()
+            return [r[0] for r in rows]
+
     # Clear all tasks from the database, for initialization or testing
     def clear_all(self) -> Dict[str, int]:
         """Clear all tasks and files from database. Returns counts of deleted records."""

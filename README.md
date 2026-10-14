@@ -17,17 +17,24 @@ A FastAPI-based audio/video transcription service using OpenAI's Whisper model w
 
 ### Prerequisites
 
-- Python 3.8+
-- CUDA-compatible GPU (optional, for faster processing)
-- FFmpeg (for audio/video processing)
+- Python 3.10+
+- NVIDIA GPU + driver (optional; falls back to CPU int8 automatically)
 
 ### Installation
 
 ```bash
 git clone "add url twin"
 cd transcraib-api
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+# GPU only: CUDA 12 cuBLAS + cuDNN 9 (loaded automatically from the venv)
+pip install nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*"
 ```
+
+The speech engine is [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2).
+On a GPU with >=4GB VRAM it loads `large-v3-turbo` (fp16); on CPU it uses int8
+(`large-v3-turbo` with >=16GB RAM, else `small`). Models download from Hugging Face on first run.
+Audio decoding is done by PyAV, so a system FFmpeg is not required.
 
 ### Running the API
 
@@ -329,6 +336,14 @@ Get current queue status and statistics.
 }
 ```
 
+### Clear All Tasks (admin)
+```http
+DELETE /admin/clear-all
+```
+Deletes every task and queued upload. Returns 409 while a task is processing.
+
+**Response:** `{"success": true, "deleted_counts": {"deleted_tasks": 3, "deleted_files": 7}}`
+
 ### Change Whisper Model
 ```http
 POST /model/set
@@ -342,13 +357,9 @@ Force a specific Whisper model for transcription.
 }
 ```
 
-**Available Models:**
-- `tiny` (1GB VRAM) - Fastest, lowest accuracy
-- `base` (1GB VRAM) - Good speed/accuracy balance
-- `small` (2GB VRAM) - Better accuracy
-- `medium` (5GB VRAM) - High accuracy
-- `large` (10GB VRAM) - Highest accuracy
-- `turbo` (6GB VRAM) - Fastest large model
+**Available Models:** `tiny`, `base`, `small`, `medium`, `distil-large-v3.5` (English only),
+`large-v3-turbo` (alias `turbo`, default), `large-v3` (most accurate, slowest).
+Returns 409 while a transcription is running (models are never swapped mid-file).
 
 **Response:**
 ```json
@@ -429,20 +440,17 @@ curl -X POST "http://localhost:9005/model/set" \
 
 ### Recommended for GPU Acceleration
 - **GPU**: NVIDIA GPU with CUDA support (AMD SUPPORT SOON)
-- **VRAM**: 
-  - 2GB+ for small models
-  - 6GB+ for turbo/medium models
-  - 10GB+ for large models
+- **VRAM**: 4GB+ for the default large-v3-turbo model
 
-### Model Performance Guide
-| Model | VRAM | CPU RAM | Speed | Accuracy |
-|-------|------|---------|--------|----------|
-| tiny  | 1GB  | 1GB     | Fastest | Lowest |
-| base  | 1GB  | 1GB     | Fast   | Good |
-| small | 2GB  | 2GB     | Medium | Better |
-| medium| 5GB  | 5GB     | Slow   | High |
-| large | 10GB | 10GB    | Slowest| Highest |
-| turbo | 6GB  | 6GB     | Fast   | High |
+### Model Performance Guide (faster-whisper, approx.)
+| Model | GPU VRAM (fp16) | Notes |
+|-------|------|-------|
+| tiny / base | <1GB | Fastest, lowest accuracy |
+| small | ~1-2GB | |
+| medium | ~2-3GB | |
+| distil-large-v3.5 | ~2-3GB | English only, very fast |
+| large-v3-turbo | ~2-3GB | Default: near large-v3 accuracy, much faster |
+| large-v3 | ~4-5GB | Highest accuracy |
 
 ## Configuration
 

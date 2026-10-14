@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, os
 from typing import Optional, List, Dict
 from .task_model import Task, TaskFile, FileStatus
 from database.task_database import TaskDatabase
@@ -13,26 +13,44 @@ current_task_id: Optional[str] = None
 # Global trackiing of queue state
 is_running = False
 
-# Global whisper model configuration
+# Hardware / runtime info, filled in by main.lifespan
+hw: Dict = {}
+gpu = False
+start_time = 0.0
+api_version = ""
+
+# Global model configuration. model_lock is held while a task transcribes and while swapping models.
 model = None
 model_name = None
-def set_model(whisper_model, name: str):
-    """Set the Whisper model for processing tasks."""
+model_lock = asyncio.Lock()
+_queue_task: Optional[asyncio.Task] = None  # strong ref so the queue task isn't garbage-collected
+
+def set_model(whisper_model, name: Optional[str]):
+    """Set the model for processing tasks."""
     global model, model_name
     model = whisper_model
     model_name = name
+
+def clear_all() -> Dict[str, int]:
+    """Clear DB and delete temp uploads still waiting in the queue."""
+    for path in db.pending_file_paths():
+        if os.path.exists(path):
+            os.remove(path)
+    return db.clear_all()
     
 # The main function to add a task to the queue
-async def add_task(file_paths: List[str], user_id: Optional[str] = None) -> str:
+async def add_task(file_paths: List[str], user_id: Optional[str] = None,
+                   file_names: Optional[List[str]] = None) -> str:
     """Add a new task to the queue and start processing if not already running."""
-    global is_running
+    global _queue_task, is_running
     
-    task = Task(file_paths, user_id)
+    task = Task(file_paths, user_id, file_names)
     db.add_task(task)
     
     # Start queue processing if not already running
     if not is_running:
-        asyncio.create_task(_process_queue())
+        is_running = True  # set before scheduling so concurrent uploads don't start a second loop
+        _queue_task = asyncio.create_task(_process_queue())
         
     return task.id
 
@@ -153,7 +171,8 @@ async def _process_queue():
             # Process the task (calling task processor function)
             try:
                 print(f"📋 Starting transcription for task {task.id} with model {model_name}")
-                await process_task(task, model, model_name, db)
+                async with model_lock:
+                    await process_task(task, model, model_name, db)
                 
                 completed_count = len(task.get_completed_files())
                 failed_count = len(task.get_failed_files())

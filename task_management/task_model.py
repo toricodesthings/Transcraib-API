@@ -21,11 +21,11 @@ class FileStatus(Enum):
 class TaskFile:
     """Class representing individual files within a transcription task (class Task)."""
     
-    def __init__(self, file_path: str, file_index: int, task_id: str):
+    def __init__(self, file_path: str, file_index: int, task_id: str, file_name: Optional[str] = None):
         self.file_path = file_path
         self.file_index = file_index
         self.task_id = task_id 
-        self.file_name = os.path.basename(file_path)
+        self.file_name = file_name or os.path.basename(file_path)
         
         # File-specific state
         self.status = FileStatus.PENDING
@@ -87,12 +87,14 @@ class Task:
     """Task model class representing a whole transcription task."""
     
     # Initialize a new task with file paths and optional user ID (for now)
-    def __init__(self, file_paths: List[str], user_id: Optional[str] = None):
+    def __init__(self, file_paths: List[str], user_id: Optional[str] = None,
+                 file_names: Optional[List[str]] = None):
         self.id = str(uuid.uuid4()) 
         self.user_id = user_id # Placeholder for future user association
         self.created_at = datetime.now()
         
-        self.files = [TaskFile(path, i, self.id) for i, path in enumerate(file_paths)]
+        names = file_names or [None] * len(file_paths)
+        self.files = [TaskFile(path, i, self.id, name) for i, (path, name) in enumerate(zip(file_paths, names))]
     
     def get_file(self, file_index: int) -> Optional[TaskFile]:
         if 0 <= file_index < len(self.files):
