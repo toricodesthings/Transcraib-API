@@ -10,6 +10,7 @@ from endpoints.transcribe import create_transcribe_endpoint
 from endpoints.set import create_model_endpoint
 from endpoints.root import router as root_router
 from endpoints.status import router as status_router
+from endpoints.cloud import router as cloud_router
 
 # API Configuration 
 API_VERSION = "1.0.0"
@@ -63,6 +64,7 @@ def main():
     app.include_router(set_model_router, prefix="/model")
     app.include_router(transcribe_router)
     app.include_router(status_router, prefix="/task", tags=["Task Management"])
+    app.include_router(cloud_router, prefix="/cloud")
 
     
     print("Whisper Transcription API Ready")

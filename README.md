@@ -476,6 +476,21 @@ The API returns detailed error messages for common issues:
 - **Size Limits**: Enforces maximum file sizes
 - **Temporary File Cleanup**: Automatically removes uploaded files after processing
 
+## Cloud Mode (OpenRouter)
+
+Optionally transcribe through OpenRouter's speech-to-text API instead of local Whisper.
+
+1. `cp .env.example .env` and set `OPENROUTER_API_KEY` (optionally `OPENROUTER_DEFAULT_MODEL`, e.g. `openai/whisper-large-v3`). `.env` is git-ignored.
+2. Restart the API and pick **Cloud** in the web UI.
+
+| Endpoint | Description |
+|---|---|
+| `GET /cloud/status` | `{configured, default_model}` |
+| `GET /cloud/models` | Speech-to-text models from OpenRouter (cached 1h) |
+| `POST /cloud/transcribe` | multipart `files` (max 5, same validation as local) + optional `model`; returns `[{file_name, transcription, model, error}]` synchronously |
+
+Files other than .mp3/.wav are converted to mono mp3 with ffmpeg before upload. Returns 503 when no key is configured. Cloud usage is billed to your OpenRouter account.
+
 ## Test Interface
 
 The API includes a built-in test interface accessible at `http://localhost:9005/test_interface.html` featuring:

@@ -31,6 +31,15 @@ progress{width:100%;height:10px}
 .file h3{font-size:.95rem;margin:0 0 6px;overflow-wrap:anywhere}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:10px;border-radius:6px;max-height:320px;overflow:auto;margin:8px 0}
 .mute{color:var(--mute);font-size:.85rem}
+.seg{display:inline-flex;border:1px solid var(--acc);border-radius:8px;overflow:hidden;margin:0 0 12px;padding:0}
+.seg legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.seg input{position:absolute;opacity:0}
+.seg label{padding:8px 20px;cursor:pointer;color:var(--acc)}
+.seg input:checked+label{background:var(--acc);color:#fff}
+.seg input:focus-visible+label{outline:2px solid var(--fg);outline-offset:-4px}
+select{flex:1;min-width:0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:inherit;font:inherit}
+.notice{border:1px solid var(--bad);border-radius:8px;padding:10px;color:var(--bad);margin:0 0 12px}
+body.cloud .local-only,body:not(.cloud) .cloud-only{display:none}
 </style>
 </head>
 <body>
@@ -48,20 +57,32 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:10p
 
 <section aria-labelledby="up-h">
   <h2 id="up-h">Upload</h2>
+  <fieldset class="seg"><legend>Transcription mode</legend>
+    <input type="radio" name="mode" id="mode-local" value="local" checked><label for="mode-local">Local</label>
+    <input type="radio" name="mode" id="mode-cloud" value="cloud"><label for="mode-cloud">Cloud</label>
+  </fieldset>
+  <div class="cloud-only">
+    <p id="cloud-off" class="notice" hidden>Cloud mode not configured — add <code>OPENROUTER_API_KEY</code> to <code>.env</code> and restart the server.</p>
+    <div class="row" style="margin-bottom:12px">
+      <label for="cmodel" class="mute">Cloud model</label>
+      <select id="cmodel"><option value="">Loading…</option></select>
+    </div>
+  </div>
   <label id="drop" for="files">Drop up to 5 audio/video files here, or click to choose<br>
     <span class="mute">.mp3 .wav .m4a .mp4 .aac .ogg .webm .ts .mov, max 1 GB each</span></label>
   <input id="files" type="file" multiple accept=".mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.ts,.mov">
   <ul id="picked" aria-label="Selected files"></ul>
   <div class="row">
-    <label for="uid" class="mute">User ID (optional)</label>
-    <input id="uid" type="text" autocomplete="off">
+    <label for="uid" class="mute local-only">User ID (optional)</label>
+    <input id="uid" type="text" autocomplete="off" class="local-only">
     <button id="send" disabled>Transcribe</button>
     <button id="reset" class="ghost" type="button">Clear selection</button>
   </div>
   <p id="up-msg" class="msg" role="status" aria-live="polite"></p>
+  <div id="cloud-results" class="cloud-only" aria-live="polite"></div>
 </section>
 
-<section aria-labelledby="task-h">
+<section aria-labelledby="task-h" class="local-only">
   <h2 id="task-h">Task</h2>
   <div class="row">
     <label for="tid" class="mute">Task ID</label>
@@ -73,7 +94,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:10p
   <div id="task"></div>
 </section>
 
-<section aria-labelledby="adm-h">
+<section aria-labelledby="adm-h" class="local-only">
   <h2 id="adm-h">Admin</h2>
   <div class="row">
     <label for="model" class="mute">Model</label>
@@ -152,7 +173,7 @@ function renderPicked() {
     b.onclick = () => { picked.splice(i, 1); renderPicked(); };
     li.append(`${f.name} (${fmtSize(f.size)}) `, b); return li;
   }));
-  $('send').disabled = !picked.length;
+  $('send').disabled = !picked.length || (document.body.classList.contains('cloud') && !(cloudReady && $('cmodel').value));
 }
 const drop = $('drop');
 ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
@@ -162,6 +183,7 @@ $('files').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 $('reset').onclick = () => { picked = []; renderPicked(); say('up-msg', ''); };
 
 $('send').onclick = async () => {
+  if (mode() === 'cloud') return sendCloud();
   const fd = new FormData();
   picked.forEach(f => fd.append('files', f));
   if ($('uid').value.trim()) fd.append('user_id', $('uid').value.trim());
@@ -179,6 +201,17 @@ function download(name, text) {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: name.replace(/\.[^.]+$/, '') + '.txt' });
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+function transcriptBlock(name, text, metaText) {
+  const meta = document.createElement('div'); meta.className = 'mute'; meta.textContent = metaText;
+  const pre = document.createElement('pre'); pre.textContent = text || '';
+  pre.tabIndex = 0; pre.setAttribute('aria-label', `Transcript of ${name}`);
+  const copy = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Copy' });
+  copy.onclick = async () => { try { await navigator.clipboard.writeText(pre.textContent); copy.textContent = 'Copied'; } catch { copy.textContent = 'Copy failed'; } setTimeout(() => copy.textContent = 'Copy', 1500); };
+  const dl = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Download .txt' });
+  dl.onclick = () => download(name, pre.textContent);
+  const row = document.createElement('div'); row.className = 'row'; row.append(copy, dl);
+  return [meta, pre, row];
+}
 function renderTask(t) {
   const results = Object.fromEntries((t.completed_results || []).map(r => [r.file_index, r]));
   const s = t.summary;
@@ -195,18 +228,8 @@ function renderTask(t) {
     d.append(h, p, st);
     if (f.error) { const e = document.createElement('div'); e.className = 'err'; e.textContent = f.error; d.append(e); }
     const r = results[f.file_index];
-    if (r) {
-      const meta = document.createElement('div'); meta.className = 'mute';
-      meta.textContent = [r.language && 'Language: ' + r.language, r.duration && 'Duration: ' + fmtTime(r.duration)].filter(Boolean).join(' · ');
-      const pre = document.createElement('pre'); pre.textContent = r.transcription || '';
-      pre.tabIndex = 0; pre.setAttribute('aria-label', `Transcript of ${f.file_name}`);
-      const copy = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Copy' });
-      copy.onclick = async () => { try { await navigator.clipboard.writeText(pre.textContent); copy.textContent = 'Copied'; } catch { copy.textContent = 'Copy failed'; } setTimeout(() => copy.textContent = 'Copy', 1500); };
-      const dl = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'Download .txt' });
-      dl.onclick = () => download(f.file_name, pre.textContent);
-      const row = document.createElement('div'); row.className = 'row'; row.append(copy, dl);
-      d.append(meta, pre, row);
-    }
+    if (r) d.append(...transcriptBlock(f.file_name, r.transcription,
+      [r.language && 'Language: ' + r.language, r.duration && 'Duration: ' + fmtTime(r.duration)].filter(Boolean).join(' · ')));
     box.append(d);
   }
 }
@@ -247,6 +270,55 @@ $('clear').onclick = async () => {
     showRecent(); refreshHeader();
   } catch (e) { say('adm-msg', e.message, true); }
 };
+
+// ---- cloud mode
+const mode = () => document.querySelector('input[name=mode]:checked').value;
+let cloudReady = false, cloudLoaded = false;
+function setMode(m) {
+  $('mode-' + m).checked = true;
+  document.body.classList.toggle('cloud', m === 'cloud');
+  try { localStorage.setItem('mode', m); } catch {}
+  if (m === 'cloud' && !cloudLoaded) loadCloud();
+  renderPicked();
+}
+document.querySelectorAll('input[name=mode]').forEach(i => i.onchange = () => setMode(i.value));
+$('cmodel').onchange = () => renderPicked();
+async function loadCloud() {
+  cloudLoaded = true;
+  const sel = $('cmodel');
+  try {
+    const s = await api('cloud/status');
+    cloudReady = s.configured; $('cloud-off').hidden = s.configured;
+    if (!s.configured) { sel.replaceChildren(new Option('Unavailable', '')); sel.disabled = true; return renderPicked(); }
+    const m = await api('cloud/models');
+    sel.replaceChildren(...m.models.map(x => new Option(`${x.name} (${x.id})`, x.id)));
+    if (m.default_model) sel.value = m.default_model;
+    sel.disabled = false;
+  } catch (e) { cloudLoaded = false; sel.replaceChildren(new Option('Failed to load', '')); say('up-msg', e.message, true); }
+  renderPicked();
+}
+async function sendCloud() {
+  const fd = new FormData();
+  picked.forEach(f => fd.append('files', f));
+  fd.append('model', $('cmodel').value);
+  $('send').disabled = true; say('up-msg', 'Uploading and transcribing via OpenRouter… this can take a while.');
+  try {
+    const rows = await api('cloud/transcribe', { method: 'POST', body: fd });
+    const box = $('cloud-results'); box.replaceChildren();
+    for (const r of rows) {
+      const d = document.createElement('div'); d.className = 'file';
+      const h = document.createElement('h3'); h.textContent = r.file_name; d.append(h);
+      if (r.error) { const e = document.createElement('div'); e.className = 'err'; e.textContent = r.error; d.append(e); }
+      else d.append(...transcriptBlock(r.file_name, r.transcription, 'Model: ' + r.model));
+      box.append(d);
+    }
+    const bad = rows.filter(r => r.error).length;
+    say('up-msg', `Done: ${rows.length - bad} transcribed` + (bad ? `, ${bad} failed` : ''), bad);
+    picked = []; renderPicked();
+  } catch (e) { say('up-msg', e.message, true); renderPicked(); }
+}
+let savedMode = 'local'; try { savedMode = localStorage.getItem('mode') === 'cloud' ? 'cloud' : 'local'; } catch {}
+setMode(savedMode);
 
 showRecent(); refreshHeader(); setInterval(refreshHeader, 10000);
 if (recent()[0]) $('tid').value = recent()[0];
