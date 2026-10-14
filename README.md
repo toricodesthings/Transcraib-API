@@ -71,7 +71,6 @@ Upload files for transcription. Returns a task ID for tracking progress.
 
 **Parameters:**
 - `files`: Audio/video files (max 5, 1GB each)
-- `user_id`: Optional user identifier
 
 **Response (201 Created):**
 ```json
@@ -385,8 +384,7 @@ Returns 409 while a transcription is running (models are never swapped mid-file)
 ```bash
 curl -X POST "http://localhost:9005/transcribe" \
   -F "files=@audio.mp3" \
-  -F "files=@video.mp4" \
-  -F "user_id=user123"
+  -F "files=@video.mp4"
 ```
 
 **Check status with file-level details:**
@@ -497,7 +495,7 @@ Optionally transcribe through OpenRouter's speech-to-text API instead of local W
 | `GET /cloud/models` | Speech-to-text models from OpenRouter (cached 1h) |
 | `POST /cloud/transcribe` | multipart `files` (max 5, same validation as local) + optional `model`; returns `[{file_name, transcription, model, error}]` synchronously |
 
-Files other than .mp3/.wav are converted to mono mp3 with ffmpeg before upload. Returns 503 when no key is configured. Cloud usage is billed to your OpenRouter account.
+Every file's audio is extracted to lossless 16 kHz mono FLAC with the system `ffmpeg` binary (must be installed) before upload. Long recordings are split into ~20 MB chunks (`CLOUD_CHUNK_MB`; length adapts to the audio, roughly 15–20 min of speech), sent 4 at a time (`CLOUD_PARALLEL_CHUNKS`), and joined in order; chunks overlap by 3 s (`CLOUD_OVERLAP_SECONDS`) and the repeated words are de-duplicated — this keeps each request under OpenRouter's 25 MB multipart cap and 60 s provider timeout, so 90-minute lectures work. Returns 503 when no key is configured. Cloud usage is billed to your OpenRouter account.
 
 ## Test Interface
 
@@ -541,3 +539,9 @@ The API includes a built-in test interface accessible at `http://localhost:9005/
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Saved Transcripts
+
+Every completed transcript (local and cloud) is written to `transcripts/<name>_<timestamp>.txt`
+(override with `TRANSCRIPTS_DIR` in `.env`). `GET /transcripts` lists them, `GET /transcripts/{name}`
+downloads one; the interface has a Saved transcripts section for both.

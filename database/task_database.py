@@ -1,276 +1,98 @@
-"""SQLite database wrapper for task management and queue."""
+"""SQLite persistence for tasks and their files."""
 import sqlite3
-from typing import List, Optional, Dict
 from datetime import datetime
+from typing import Dict, List, Optional
 from task_management.task_model import Task, TaskFile, FileStatus
-class TaskDatabase:
-    # Initialize the database and create tasks table if it doesn't exist
-    def __init__(self, db_path: str = "tasks.db"):
-        self.db_path = db_path
-        self._initialize_database()
-    
-    # Create tasks table
-    def _initialize_database(self):
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT,
-                    created_at TEXT,
-                    file_count INTEGER
-                )
-            ''')
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS task_files (
-                    task_id TEXT,
-                    file_index INTEGER,
-                    file_name TEXT,
-                    file_path TEXT,
-                    status TEXT,
-                    progress INTEGER DEFAULT 0,
-                    transcription TEXT,
-                    language TEXT,
-                    duration REAL,
-                    error_message TEXT,
-                    created_at TEXT,
-                    started_at TEXT,
-                    completed_at TEXT,
-                    PRIMARY KEY (task_id, file_index),
-                    FOREIGN KEY (task_id) REFERENCES tasks (id)
-                )
-            ''')
-            
-            # Index for faster queries
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_task_files_status 
-                ON task_files (status)
-            ''')
-            
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_task_files_task_id 
-                ON task_files (task_id)
-            ''')
-            conn.commit()
-    
-    # Add OR update a task in the database with status and results
-    def add_task(self, task: Task) -> None:
-        
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # Insert/update task record
-            cursor.execute('''
-                INSERT OR REPLACE INTO tasks (id, user_id, created_at, file_count)
-                VALUES (?, ?, ?, ?)
-            ''', (
-                task.id,
-                task.user_id,
-                task.created_at.isoformat(),
-                len(task.files)
-            ))
-            
-                    # Insert/update all file records
-            for file in task.files:
-                cursor.execute('''
-                    INSERT OR REPLACE INTO task_files (
-                        task_id, file_index, file_name, file_path, status, progress,
-                        transcription, language, duration, error_message,
-                        created_at, started_at, completed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    file.task_id,
-                    file.file_index,
-                    file.file_name,
-                    file.file_path,
-                    file.status.value,
-                    file.progress,
-                    file.transcription,
-                    file.language,
-                    file.duration,
-                    file.error_message,
-                    file.created_at.isoformat(),
-                    file.started_at.isoformat() if file.started_at else None,
-                    file.completed_at.isoformat() if file.completed_at else None
-                ))
-            
-            conn.commit()
-            
-    
-    # Retrieve a task by task ID
-    def retrieve_task(self, task_id: str) -> Optional[Task]:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
-            task_row = cursor.fetchone()
-                        
-            if task_row:
-                # Get all files for this task
-                cursor.execute('''
-                    SELECT * FROM task_files WHERE task_id = ? ORDER BY file_index
-                ''', (task_id,))
-                file_rows = cursor.fetchall()
 
-                task = Task([], task_row[1])
-                task.id = task_row[0]
-                task.user_id = task_row[1]
-                task.created_at = datetime.fromisoformat(task_row[2])
-                
-                # Reconstruct TaskFile objects
-                task.files = []
-                for row in file_rows:
-                    file = TaskFile(row[3], row[1], row[0])
-                    file.file_name = row[2]
-                    file.status = FileStatus(row[4])
-                    file.progress = row[5]
-                    file.transcription = row[6]
-                    file.language = row[7]
-                    file.duration = row[8]
-                    file.error_message = row[9]
-                    file.created_at = datetime.fromisoformat(row[10])
-                    file.started_at = datetime.fromisoformat(row[11]) if row[11] else None
-                    file.completed_at = datetime.fromisoformat(row[12]) if row[12] else None
-                    
-                    task.files.append(file)
+DB_PATH = "tasks.db"
+FILE_COLS = ("task_id, file_index, file_name, file_path, status, progress, transcription, "
+             "language, duration, error_message, created_at, started_at, completed_at")
 
-                return task
-            
+
+def _conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+with _conn() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, created_at TEXT, file_count INTEGER);
+        CREATE TABLE IF NOT EXISTS task_files (
+            task_id TEXT, file_index INTEGER, file_name TEXT, file_path TEXT, status TEXT,
+            progress INTEGER DEFAULT 0, transcription TEXT, language TEXT, duration REAL,
+            error_message TEXT, created_at TEXT, started_at TEXT, completed_at TEXT,
+            PRIMARY KEY (task_id, file_index), FOREIGN KEY (task_id) REFERENCES tasks (id));
+        CREATE INDEX IF NOT EXISTS idx_task_files_status ON task_files (status);
+    ''')
+
+
+def _iso(dt: Optional[datetime]) -> Optional[str]:
+    return dt.isoformat() if dt else None
+
+
+def _dt(s: Optional[str]) -> Optional[datetime]:
+    return datetime.fromisoformat(s) if s else None
+
+
+def save_task(task: Task) -> None:
+    """Insert or update a task and all its files."""
+    with _conn() as c:
+        c.execute("INSERT OR REPLACE INTO tasks (id, created_at, file_count) VALUES (?, ?, ?)",
+                  (task.id, task.created_at.isoformat(), len(task.files)))
+        c.executemany(f"INSERT OR REPLACE INTO task_files ({FILE_COLS}) VALUES ({', '.join('?' * 13)})", [
+            (f.task_id, f.file_index, f.file_name, f.file_path, f.status.value, f.progress,
+             f.transcription, f.language, f.duration, f.error_message,
+             f.created_at.isoformat(), _iso(f.started_at), _iso(f.completed_at))
+            for f in task.files])
+
+
+def retrieve_task(task_id: str) -> Optional[Task]:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if not row:
             return None
-    
-    def retrieve_pending(self) -> List[Task]:
-        """Retrieve all tasks that have pending files."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # Find tasks with any pending files
-            cursor.execute('''
-                SELECT DISTINCT task_id FROM task_files 
-                WHERE status = ? 
-                ORDER BY created_at
-            ''', (FileStatus.PENDING.value,))
-            
-            task_ids = [row[0] for row in cursor.fetchall()]
-            
-            # Retrieve full task objects
-            tasks = []
-            for task_id in task_ids:
-                task = self.retrieve_task(task_id)
-                if task:
-                    tasks.append(task)
-            
-            return tasks
-        
-    def get_completed_files(self, limit: int = 50) -> List[Dict]:
-        """Get recently completed files across all tasks."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT task_id, file_index, file_name, transcription, language, 
-                       duration, completed_at
-                FROM task_files 
-                WHERE status = ? AND completed_at IS NOT NULL
-                ORDER BY completed_at DESC
-                LIMIT ?
-            ''', (FileStatus.COMPLETED.value, limit))
-            
-            return [
-                {
-                    "task_id": row[0],
-                    "file_index": row[1],
-                    "filename": row[2],
-                    "transcription": row[3],
-                    "language": row[4],
-                    "duration": row[5],
-                    "completed_at": row[6]
-                }
-                for row in cursor.fetchall()
-            ]
-            
-    # ADDED: Get file-level statistics
-    def get_file_stats(self) -> Dict:
-        """Get statistics about file processing."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            stats = {}
-            for status in FileStatus:
-                cursor.execute('''
-                    SELECT COUNT(*) FROM task_files WHERE status = ?
-                ''', (status.value,))
-                stats[status.value] = cursor.fetchone()[0]
-            
-            return {
-                "file_counts": stats,
-                "total_files": sum(stats.values())
-            }
-    
-    def get_task_queue_position(self, task_id: str) -> int:
-        """Get the position of a specific task in the queue (1-based)."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # Get all truly pending tasks ordered by creation time
-            cursor.execute('''
-                SELECT task_id FROM task_files 
-                GROUP BY task_id 
-                HAVING COUNT(*) = SUM(CASE WHEN status = ? THEN 1 ELSE 0 END)
-                ORDER BY MIN(created_at)
-            ''', (FileStatus.PENDING.value,))
-            
-            pending_task_ids = [row[0] for row in cursor.fetchall()]
-            
-            try:
-                return pending_task_ids.index(task_id) + 1  # 1-based position
-            except ValueError:
-                return 0  # Task not in pending queue
+        task = Task([])
+        task.id, task.created_at = row["id"], datetime.fromisoformat(row["created_at"])
+        for r in c.execute("SELECT * FROM task_files WHERE task_id = ? ORDER BY file_index", (task_id,)):
+            f = TaskFile(r["file_path"], r["file_index"], r["task_id"], r["file_name"])
+            f.status = FileStatus(r["status"])
+            f.progress, f.transcription, f.language = r["progress"], r["transcription"], r["language"]
+            f.duration, f.error_message = r["duration"], r["error_message"]
+            f.created_at = datetime.fromisoformat(r["created_at"])
+            f.started_at, f.completed_at = _dt(r["started_at"]), _dt(r["completed_at"])
+            task.files.append(f)
+        return task
 
-    def count_truly_pending_tasks(self) -> int:
-        """Count tasks where ALL files are still pending."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT COUNT(DISTINCT task_id) FROM task_files 
-                WHERE task_id IN (
-                    SELECT task_id FROM task_files 
-                    GROUP BY task_id 
-                    HAVING COUNT(*) = SUM(CASE WHEN status = ? THEN 1 ELSE 0 END)
-                )
-            ''', (FileStatus.PENDING.value,))
-            
-            return cursor.fetchone()[0]
-        
-    def pending_file_paths(self) -> List[str]:
-        """Temp paths of files not yet processed (processed files are already deleted)."""
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute("SELECT file_path FROM task_files WHERE status IN (?, ?)",
-                                (FileStatus.PENDING.value, FileStatus.PROCESSING.value)).fetchall()
-            return [r[0] for r in rows]
 
-    # Clear all tasks from the database, for initialization or testing
-    def clear_all(self) -> Dict[str, int]:
-        """Clear all tasks and files from database. Returns counts of deleted records."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # Count records before deletion
-            cursor.execute('SELECT COUNT(*) FROM tasks')
-            task_count = cursor.fetchone()[0]
-            
-            cursor.execute('SELECT COUNT(*) FROM task_files')
-            file_count = cursor.fetchone()[0]
-            
-            # Delete all records (files first due to foreign key)
-            cursor.execute('DELETE FROM task_files')
-            cursor.execute('DELETE FROM tasks')
-            
-            conn.commit()
-            
-            return {
-                "deleted_tasks": task_count,
-                "deleted_files": file_count
-            }
+def next_pending() -> Optional[Task]:
+    """Oldest task that still has a pending file."""
+    with _conn() as c:
+        row = c.execute("SELECT task_id FROM task_files WHERE status = ? ORDER BY created_at LIMIT 1",
+                        (FileStatus.PENDING.value,)).fetchone()
+    return retrieve_task(row[0]) if row else None
+
+
+def count_truly_pending_tasks() -> int:
+    """Count tasks where ALL files are still pending."""
+    with _conn() as c:
+        return c.execute('''
+            SELECT COUNT(*) FROM (SELECT task_id FROM task_files GROUP BY task_id
+                                  HAVING COUNT(*) = SUM(status = ?))
+        ''', (FileStatus.PENDING.value,)).fetchone()[0]
+
+
+def pending_file_paths() -> List[str]:
+    """Temp paths of files not yet processed (processed files are already deleted)."""
+    with _conn() as c:
+        rows = c.execute("SELECT file_path FROM task_files WHERE status IN (?, ?)",
+                         (FileStatus.PENDING.value, FileStatus.PROCESSING.value)).fetchall()
+    return [r[0] for r in rows]
+
+
+def clear_all() -> Dict[str, int]:
+    """Clear all tasks and files. Returns counts of deleted records."""
+    with _conn() as c:
+        files = c.execute("DELETE FROM task_files").rowcount
+        tasks = c.execute("DELETE FROM tasks").rowcount
+    return {"deleted_tasks": tasks, "deleted_files": files}

@@ -1,7 +1,7 @@
 import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from hardware_utils import model_override, load_model
+from hardware_utils import model_override, load_model, bytes_to_gb
 from task_management import task_manager
 
 router = APIRouter()
@@ -16,7 +16,7 @@ async def force_model(request: ModelRequest):
     """Force a specific model for transcription."""
     hw, gpu = task_manager.hw, task_manager.gpu
     try:
-        validated_model = model_override(request.model_name, hw, gpu)
+        model_override(request.model_name, hw, gpu)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -30,8 +30,8 @@ async def force_model(request: ModelRequest):
         task_manager.set_model(None, None)
         loop = asyncio.get_running_loop()
         try:
-            new_model, task_manager.gpu = await loop.run_in_executor(None, load_model, validated_model, hw, gpu)
-            task_manager.set_model(new_model, validated_model)
+            new_model, task_manager.gpu = await loop.run_in_executor(None, load_model, request.model_name, hw, gpu)
+            task_manager.set_model(new_model, request.model_name)
         except Exception as e:
             old, _ = await loop.run_in_executor(None, load_model, previous_model, hw, gpu)
             task_manager.set_model(old, previous_model)
@@ -39,13 +39,13 @@ async def force_model(request: ModelRequest):
 
     return {
         "success": True,
-        "message": f"Model successfully set to '{validated_model}'",
+        "message": f"Model successfully set to '{request.model_name}'",
         "previous_model": previous_model,
-        "new_model": validated_model,
+        "new_model": request.model_name,
         "gpu_enabled": task_manager.gpu,
         "hardware_info": {
             "gpu_count": hw["gpu_count"],
-            "total_vram_gb": hw["total_vram_bytes"] / (1024**3) if hw["total_vram_bytes"] else None,
-            "system_ram_gb": hw["system_ram_bytes"] / (1024**3)
+            "total_vram_gb": bytes_to_gb(hw["total_vram_bytes"]),
+            "system_ram_gb": bytes_to_gb(hw["system_ram_bytes"])
         }
     }

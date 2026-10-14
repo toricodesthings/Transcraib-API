@@ -76,22 +76,11 @@ async def get_task_results(task_id: str):
     
     return {
         "task_id": task_id,
-        "completed_at": max(f.completed_at for f in task.files if f.completed_at).isoformat(),
+        "completed_at": max(f.completed_at for f in task.files).isoformat(),
         "summary": task.json_response_format()["summary"],
-        "results": [
-            {
-                "file_index": f.file_index,
-                "file_name": f.file_name,
-                "status": f.status.value,
-                "transcription": f.transcription,
-                "language": f.language,
-                "duration": f.duration,
-                "error": f.error_message
-            }
-            for f in task.files
-        ]
+        "results": [{**f.result_dict(), "status": f.status.value, "error": f.error_message} for f in task.files]
     }
-    
+
 # Get only completed results
 @router.get("/results/{task_id}/completed")
 async def get_completed_results(task_id: str):

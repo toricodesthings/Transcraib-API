@@ -1,16 +1,15 @@
-import time
+import os, time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from task_management import task_manager
 from hardware_utils import detect_hardware, model_pick, load_model
-from endpoints.health import router as health_router
 from endpoints.transcribe import router as transcribe_router
 from endpoints.set import router as set_model_router
-from endpoints.root import router as root_router
 from endpoints.status import router as status_router
-from endpoints.admin import router as admin_router
 from endpoints.cloud import router as cloud_router
+from endpoints.transcripts import router as transcripts_router
 
 API_VERSION = "1.0.0"
 
@@ -52,10 +51,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health_router)
-app.include_router(root_router)
 app.include_router(set_model_router, prefix="/model")
 app.include_router(transcribe_router)
 app.include_router(status_router, prefix="/task", tags=["Task Management"])
-app.include_router(admin_router, prefix="/admin")
 app.include_router(cloud_router, prefix="/cloud")
+app.include_router(transcripts_router, prefix="/transcripts")
+
+
+@app.get("/")
+def interface():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "interface.html"))
+
+
+@app.get("/health")
+def health():
+    return {"status": "normal",
+            "system_gpu": task_manager.hw["gpu_name"],
+            "whispermodel": task_manager.model_name,
+            "uptime_seconds": round(time.time() - task_manager.start_time, 1),
+            "api_version": task_manager.api_version}
+
+
+@app.delete("/admin/clear-all")
+def clear_all():
+    """Delete all tasks/files. Refused while a task is being transcribed."""
+    if task_manager.current_task_id is not None:
+        raise HTTPException(status_code=409, detail="A task is currently processing; try again when it finishes")
+    return {"success": True, "deleted_counts": task_manager.clear_all()}

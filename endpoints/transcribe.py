@@ -1,6 +1,6 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException, Form
+from fastapi import APIRouter, File, UploadFile, HTTPException
 from tempfile import NamedTemporaryFile
-from typing import List, Optional
+from typing import List
 import os
 
 import filetype
@@ -113,8 +113,7 @@ async def save_upload(file: UploadFile) -> str:
 
 @router.post("/transcribe")
 async def transcribe_audio(
-    files: List[UploadFile] = File(..., description="Audio/video files to transcribe (max 5)"),
-    user_id: Optional[str] = Form(None, description="Optional user identifier")
+    files: List[UploadFile] = File(..., description="Audio/video files to transcribe (max 5)")
 ):
     if len(files) > MAX_FILES_PER_BATCH:
         raise HTTPException(status_code=400, detail=f"Maximum {MAX_FILES_PER_BATCH} files allowed")
@@ -123,7 +122,7 @@ async def transcribe_audio(
     try:
         for file in files:
             temp_file_paths.append(await save_upload(file))
-        task_id = await add_task(temp_file_paths, user_id, [f.filename for f in files])
+        task_id = await add_task(temp_file_paths, [f.filename for f in files])
     except Exception as e:
         for path in temp_file_paths:
             if os.path.exists(path):

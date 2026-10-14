@@ -73,8 +73,6 @@ body.cloud .local-only,body:not(.cloud) .cloud-only{display:none}
   <input id="files" type="file" multiple accept=".mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.ts,.mov">
   <ul id="picked" aria-label="Selected files"></ul>
   <div class="row">
-    <label for="uid" class="mute local-only">User ID (optional)</label>
-    <input id="uid" type="text" autocomplete="off" class="local-only">
     <button id="send" disabled>Transcribe</button>
     <button id="reset" class="ghost" type="button">Clear selection</button>
   </div>
@@ -94,12 +92,18 @@ body.cloud .local-only,body:not(.cloud) .cloud-only{display:none}
   <div id="task"></div>
 </section>
 
+<section aria-labelledby="saved-h">
+  <h2 id="saved-h">Saved transcripts</h2>
+  <div class="row"><button id="saved-refresh">Refresh</button></div>
+  <ul id="saved" class="mute"></ul>
+</section>
+
 <section aria-labelledby="adm-h" class="local-only">
   <h2 id="adm-h">Admin</h2>
   <div class="row">
     <label for="model" class="mute">Model</label>
     <input id="model" type="text" list="models" autocomplete="off" placeholder="e.g. turbo">
-    <datalist id="models"><option>tiny</option><option>base</option><option>small</option><option>medium</option><option>large</option><option>turbo</option></datalist>
+    <datalist id="models"><option>tiny</option><option>base</option><option>small</option><option>medium</option><option>distil-large-v3.5</option><option>large-v3-turbo</option><option>large-v3</option></datalist>
     <button id="setmodel">Set model</button>
   </div>
   <div class="row" style="margin-top:12px"><button id="clear" class="danger">Clear all tasks…</button></div>
@@ -186,7 +190,6 @@ $('send').onclick = async () => {
   if (mode() === 'cloud') return sendCloud();
   const fd = new FormData();
   picked.forEach(f => fd.append('files', f));
-  if ($('uid').value.trim()) fd.append('user_id', $('uid').value.trim());
   $('send').disabled = true; say('up-msg', 'Uploading…');
   try {
     const r = await api('transcribe', { method: 'POST', body: fd });
@@ -239,6 +242,7 @@ async function poll(id) {
     renderTask(t);
     const done = ['completed', 'failed'].includes(t.summary.overall_status);
     say('task-msg', done ? `Task ${t.summary.overall_status}.` : 'Processing…');
+    if (done) loadSaved();
     if (!done) timer = setTimeout(() => poll(id), 2000);
   } catch (e) { say('task-msg', e.message, true); }
 }
@@ -267,9 +271,23 @@ $('clear').onclick = async () => {
     say('adm-msg', 'Cleared: ' + JSON.stringify(r));
     clearTimeout(timer); $('task').replaceChildren(); say('task-msg', '');
     try { localStorage.removeItem('recentTasks'); } catch {}
-    showRecent(); refreshHeader();
+    showRecent(); refreshHeader(); loadSaved();
   } catch (e) { say('adm-msg', e.message, true); }
 };
+
+// ---- saved transcripts
+async function loadSaved() {
+  try {
+    const list = await api('transcripts');
+    $('saved').replaceChildren(...(list.length ? list.map(t => {
+      const li = document.createElement('li');
+      const a = Object.assign(document.createElement('a'), { href: 'transcripts/' + encodeURIComponent(t.name), download: t.name, textContent: t.name });
+      li.append(a, ` — ${new Date(t.saved_at).toLocaleString()}`);
+      return li;
+    }) : [Object.assign(document.createElement('li'), { textContent: 'None yet.' })]));
+  } catch (e) { $('saved').textContent = e.message; }
+}
+$('saved-refresh').onclick = loadSaved;
 
 // ---- cloud mode
 const mode = () => document.querySelector('input[name=mode]:checked').value;
@@ -314,7 +332,7 @@ async function sendCloud() {
     }
     const bad = rows.filter(r => r.error).length;
     say('up-msg', `Done: ${rows.length - bad} transcribed` + (bad ? `, ${bad} failed` : ''), bad);
-    picked = []; renderPicked();
+    picked = []; renderPicked(); loadSaved();
   } catch (e) { say('up-msg', e.message, true); renderPicked(); }
 }
 let savedMode = 'local'; try { savedMode = localStorage.getItem('mode') === 'cloud' ? 'cloud' : 'local'; } catch {}

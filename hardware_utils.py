@@ -91,7 +91,7 @@ def load_model(name, hardware, gpu):
 
 
 def model_override(model_name, hardware, gpu=False):
-    """Validate a requested model name against available memory."""
+    """Raise ValueError if the model is unknown or doesn't fit in memory."""
     if model_name not in VALID_MODELS:
         raise ValueError(f"Invalid model name '{model_name}'. Valid options are: {', '.join(VALID_MODELS)}")
     if gpu:
@@ -99,4 +99,3 @@ def model_override(model_name, hardware, gpu=False):
             raise ValueError("Insufficient VRAM for the selected model")
     elif VALID_MODELS[model_name] > bytes_to_gb(hardware["system_ram_bytes"]):
         raise ValueError("Insufficient system RAM for the selected model")
-    return model_name
