@@ -2,6 +2,7 @@ import asyncio, os
 from typing import Optional, List, Dict
 from .task_model import Task, TaskFile, FileStatus
 from database import task_database as db
+from hardware_utils import load_model
 from endpoints.transcripts import save_transcript
 
 current_task_id: Optional[str] = None
@@ -110,7 +111,11 @@ async def _process_queue():
 
 async def _process_task(task: Task):
     """Transcribe each file in the task, saving status/results as we go."""
+    global model, gpu
     loop = asyncio.get_running_loop()
+    if model is None:  # lazy: first local transcription downloads/loads the model (caller holds model_lock)
+        print(f"⬇️ Loading model {model_name} (first use, may download)...")
+        model, gpu = await loop.run_in_executor(None, load_model, model_name, hw, gpu)
     for file in task.files:
         try:
             print(f'🔄 Starting file {file.file_index + 1}/{len(task.files)}: {file.file_name}')

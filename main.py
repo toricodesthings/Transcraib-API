@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from task_management import task_manager
-from hardware_utils import detect_hardware, model_pick, load_model
+from hardware_utils import detect_hardware, model_pick
 from endpoints.transcribe import router as transcribe_router
 from endpoints.set import router as set_model_router
 from endpoints.status import router as status_router
@@ -24,12 +24,11 @@ async def lifespan(app: FastAPI):
 
     name, gpu = model_pick(hw)
     print("Selected Model:", name)
-    model, gpu = load_model(name, hw, gpu)
     task_manager.hw = hw
     task_manager.gpu = gpu
     task_manager.start_time = time.time()
     task_manager.api_version = API_VERSION
-    task_manager.set_model(model, name)
+    task_manager.set_model(None, name)  # downloaded/loaded on the first local transcription
 
     print("Cleared existing tasks from previous sessions:", task_manager.clear_all())
     print("Transcription API Ready")
@@ -68,6 +67,7 @@ def health():
     return {"status": "normal",
             "system_gpu": task_manager.hw["gpu_name"],
             "whispermodel": task_manager.model_name,
+            "model_loaded": task_manager.model is not None,
             "uptime_seconds": round(time.time() - task_manager.start_time, 1),
             "api_version": task_manager.api_version}
 

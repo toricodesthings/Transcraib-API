@@ -26,6 +26,10 @@ async def force_model(request: ModelRequest):
 
     async with task_manager.model_lock:
         previous_model = task_manager.model_name
+        if task_manager.model is None:  # nothing loaded yet: just pick it, load lazily on first use
+            task_manager.set_model(None, request.model_name)
+            return {"success": True, "previous_model": previous_model, "new_model": request.model_name,
+                    "message": f"Model set to '{request.model_name}'; it will download/load on the first local transcription"}
         # Drop the old model first so both never sit in VRAM together.
         task_manager.set_model(None, None)
         loop = asyncio.get_running_loop()

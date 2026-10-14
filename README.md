@@ -545,3 +545,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 Every completed transcript (local and cloud) is written to `transcripts/<name>_<timestamp>.txt`
 (override with `TRANSCRIPTS_DIR` in `.env`). `GET /transcripts` lists them, `GET /transcripts/{name}`
 downloads one; the interface has a Saved transcripts section for both.
+
+The local model is not downloaded at startup: it downloads/loads on the first local transcription (Cloud mode never needs it).
